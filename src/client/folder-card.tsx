@@ -127,8 +127,10 @@ export function FolderCard(props: FolderCardProps) {
         </button>
         <input
           id={`${id}-name`}
+          data-folder-name-index={index}
           aria-label={t('folder.name')}
           aria-invalid={nameMessage === undefined ? undefined : true}
+          aria-errormessage={nameMessage === undefined ? undefined : `${id}-name-error`}
           placeholder={t('folder.namePlaceholder')}
           style={
             nameMessage === undefined
@@ -163,7 +165,7 @@ export function FolderCard(props: FolderCardProps) {
         </div>
       </div>
       {nameMessage === undefined ? null : (
-        <p style={errorStyle} role="alert">
+        <p id={`${id}-name-error`} style={errorStyle} role="alert">
           {nameMessage}
         </p>
       )}

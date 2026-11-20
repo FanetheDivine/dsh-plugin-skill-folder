@@ -11,7 +11,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseSkillsPayload } from '../src/client/api.ts';
 import { autoGroup as autoGroupFolders } from '../src/client/auto-group.ts';
 import { type FolderFormState, ROW_ID, ROW_KEY } from '../src/client/folder-form.ts';
-import { collapsedAfterRemoval, FolderPage, filterSkillNames } from '../src/client/folder-page.tsx';
+import {
+  collapsedAfterRemoval,
+  effectiveFolderCollapsed,
+  FolderPage,
+  filterSkillNames,
+} from '../src/client/folder-page.tsx';
 import * as clientEntry from '../src/client/index.ts';
 import { en, NS, zh } from '../src/client/locales.ts';
 import { type ClientServiceName, makeClientCtx } from './helpers.ts';
@@ -216,6 +221,9 @@ describe('配置页渲染', () => {
     expect(html).toMatch(/<select[^>]*aria-label="移动到 lark-doc"/);
     expect(html).toContain('<option value="">未分组</option>');
     expect(html).toContain('<option value="lark" selected="">lark</option>');
+    expect(html).toContain('data-skill-move="lark-doc"');
+    expect(html).toContain('data-skill-drag-handle="lark-doc"');
+    expect(html).toContain('aria-label="拖拽 lark-doc"');
   });
 
   it('文件夹名称为空时显示错误并标记输入框', () => {
@@ -233,6 +241,7 @@ describe('配置页渲染', () => {
     );
     expect(html).toContain('文件夹名称不能为空。');
     expect(html).toContain('aria-invalid="true"');
+    expect(html).toMatch(/aria-errormessage="[^"]+"/);
     expect(html).toContain('文件夹配置有误，修正后才能保存。');
   });
 
@@ -243,6 +252,13 @@ describe('配置页渲染', () => {
     expect(html).toContain('role="status"');
     expect(html).toContain('data-skill-folder-focus-styles');
     expect(html).toContain(':focus-visible');
+  });
+
+  it('提供自动分组规则与移动操作的实时播报区域', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('先按文件夹名匹配');
+    expect(html).toContain('data-skill-folder-live');
+    expect(html).toContain('aria-live="polite"');
   });
 
   it('英文界面包含新增的页面、筛选与折叠文案', () => {
@@ -318,6 +334,13 @@ describe('配置页临时视图状态', () => {
       filterSkillNames(['lark-doc', 'lark-sheet', 'x-calendar'], descriptions, 'sheets'),
     ).toEqual(['lark-sheet']);
     expect(filterSkillNames(['lark-doc'], descriptions, 'missing')).toEqual([]);
+  });
+
+  it('筛选激活时临时展开有匹配项的文件夹', () => {
+    expect(effectiveFolderCollapsed(true, true, 1)).toBe(false);
+    expect(effectiveFolderCollapsed(true, true, 0)).toBe(true);
+    expect(effectiveFolderCollapsed(true, false, 1)).toBe(true);
+    expect(effectiveFolderCollapsed(false, true, 1)).toBe(false);
   });
 
   it('删除文件夹后折叠下标跟随原文件夹移动', () => {

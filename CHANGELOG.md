@@ -18,6 +18,7 @@
 
 ### Changed
 
+- 优化「技能文件夹」配置页的信息层级、响应式卡片与状态反馈，支持全区域筛选、结果计数和文件夹折叠
 - 实机脚本以官方 web 默认 profile 为底本，不再覆写技能插件；驱动会话挂 `standard` preset，新增 `B0` 用例守住 preset 会话的技能目录消息
 - 宿主依赖升级：9 个 `@deepseek-ai/dsh-*` 开发依赖从 `0.2.2-rc.3` 固定到 `0.2.2-rc.5`，`pnpm-workspace.yaml` 豁免清单与锁文件同步
 - 仓库从 DSH 插件模板转化为 `dsh-plugin-skill-folder@0.1.0`，移除模板示例工具、事件日志与示例行

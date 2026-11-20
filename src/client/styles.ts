@@ -324,6 +324,43 @@ export const chipNameStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
+/** 独立拖拽手柄与技能名称。 */
+export const dragHandleStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  minWidth: 0,
+  padding: 0,
+  border: 0,
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  cursor: 'grab',
+  touchAction: 'none',
+};
+
+/** 拖拽手柄图标。 */
+export const dragIconStyle: CSSProperties = {
+  flexShrink: 0,
+  color: 'var(--dsw-alias-label-secondary)',
+  fontSize: 12,
+  letterSpacing: -2,
+};
+
+/** 仅供读屏播报的实时状态。 */
+export const srOnlyStyle: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
+
 /** 「移动到」下拉框。 */
 export const selectStyle: CSSProperties = {
   height: 20,
@@ -352,7 +389,8 @@ export const optionsGridStyle: CSSProperties = {
 export const focusStyleText = `
   [data-skill-folder-page] button:focus-visible,
   [data-skill-folder-page] input:focus-visible,
-  [data-skill-folder-page] select:focus-visible {
+  [data-skill-folder-page] select:focus-visible,
+  [data-skill-folder-page] [data-skill-drag-handle]:focus-visible {
     outline: 2px solid var(--dsw-alias-brand-primary);
     outline-offset: 2px;
   }

@@ -36,10 +36,12 @@ Record each undecided question with a stable id and its dependencies.
 - [D-001] Q: 本次优化的范围与优先级？ -> A: 聚焦配置页的信息层级、列表浏览与操作反馈，保留现有分组和保存能力。依据：用户授权自主优化且明确要求不交互。
 - [D-002] Q: 筛选是否覆盖已分组技能？ -> A: 覆盖全部文件夹与未分组区域。依据：统一搜索入口应能定位全部可见技能。
 - [D-003] Q: 长文件夹采用什么浏览方式？ -> A: 允许独立折叠成员列表，名称、简介与计数保持可见。依据：兼顾页面密度与配置上下文。
+- [D-004] Q: 筛选结果位于折叠文件夹时如何展示？ -> A: 筛选激活时临时展开有匹配项的文件夹，清除后恢复原折叠状态。依据：真实浏览器验收发现结果被折叠状态遮挡；用户已免除交互审查。
 
 ## Review Record
 
-- 2026-11-20 | Decision: Waived | Scope: current full document | Open items: none | Risks: 用户要求不交互，免除需求访谈与完整规格审查；视觉取舍由自动化行为测试与响应式检查验证
+- 2026-11-20 | Decision: Waived | Scope: 初始完整规格 | Open items: none | Risks: 用户要求不交互，免除需求访谈与完整规格审查；视觉取舍由自动化行为测试与响应式检查验证
+- 2026-11-20 | Decision: Waived | Scope: current full document | Open items: none | Risks: 用户要求不交互；真实浏览器验收驱动筛选可见性修订，键盘交互继续由实机验证
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -71,6 +73,7 @@ Record each undecided question with a stable id and its dependencies.
 1. **Given** 多个文件夹和未分组区域都有技能，**When** 用户输入名称或描述关键词，**Then** 所有区域只展示匹配成员。
 2. **Given** 筛选没有匹配项，**When** 用户查看页面，**Then** 各空区域给出与筛选状态一致的提示，且可清除筛选。
 3. **Given** 文件夹包含成员，**When** 用户折叠或展开文件夹，**Then** 成员列表相应隐藏或显示，名称、简介与成员计数保持可见。
+4. **Given** 匹配项位于已折叠文件夹，**When** 用户激活筛选，**Then** 匹配成员临时可见，清除筛选后恢复原折叠状态。
 
 ---
 
@@ -102,7 +105,7 @@ Record each undecided question with a stable id and its dependencies.
 - **FR-002**: 文件夹与未分组区域 MUST 使用一致的视觉层级，并在窄屏下自适应排列。
 - **FR-003**: 筛选 MUST 同时作用于已分组与未分组技能，匹配名称或描述。
 - **FR-004**: 用户 MUST 能清除筛选，并看到当前筛选结果数量。
-- **FR-005**: 每个文件夹 MUST 支持独立折叠和展开成员列表。
+- **FR-005**: 每个文件夹 MUST 支持独立折叠和展开成员列表；筛选激活时 MUST 临时展开有匹配项的文件夹，清除后恢复原折叠状态。
 - **FR-006**: 文件夹折叠时 MUST 保留名称、简介、成员计数、删除和放置能力。
 - **FR-007**: 加载、错误、不完整列表、校验错误与空结果 MUST 保持可区分的状态反馈。
 - **FR-008**: 现有新建、改名、简介编辑、删除、拖拽、下拉移动、自动分组、保存与放弃流程 MUST 保持可用。

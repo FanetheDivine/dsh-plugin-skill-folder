@@ -49,6 +49,8 @@ export const zh = {
   'ungrouped.drop': '拖到这里移出文件夹',
   'skill.move': '移动到',
   'skill.moveToUngrouped': '未分组',
+  'skill.drag': '拖拽 {name}',
+  'skill.moved': '已将 {name} 移动到 {folder}',
   'autoGroup.label': '按前缀自动分组',
   'autoGroup.hint': '先按文件夹名匹配，其余按 - 分段最长公共前缀合并，成员不少于 2 个才成组。',
   'autoGroup.description': '{prefix} 系列技能',
@@ -110,6 +112,8 @@ export const en: Record<FolderKey, string> = {
   'ungrouped.drop': 'Drop here to remove from a folder',
   'skill.move': 'Move to',
   'skill.moveToUngrouped': 'Ungrouped',
+  'skill.drag': 'Drag {name}',
+  'skill.moved': 'Moved {name} to {folder}',
   'autoGroup.label': 'Group by prefix',
   'autoGroup.hint':
     'Matches folder names first, then merges the rest by their longest shared - segment prefix; a group needs at least 2 members.',

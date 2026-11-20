@@ -79,6 +79,9 @@
 ### Implementation for User Story 3
 
 - [x] T012 [US3] 在 `src/client/folder-page.tsx`、`src/client/folder-card.tsx` 与 `src/client/skill-chip.tsx` 完善状态展示、标签、键盘操作和禁用状态
+- [x] T016 [US3] 在 `tests/client.test.ts` 添加独立拖拽手柄、名称错误关联、焦点接续、移动播报与筛选临时展开的失败测试
+- [x] T017 [US3] 在 `src/client/skill-chip.tsx` 实现独立拖拽手柄，在 `src/client/folder-page.tsx` 实现移动、删除、新建和清除后的焦点接续与实时播报
+- [x] T018 [US3] 在 `src/client/folder-page.tsx` 与 `src/client/folder-card.tsx` 实现筛选临时展开、自动分组规则、不完整列表重试和名称错误关联
 
 **Checkpoint**: 三个故事均具备独立可测试的行为和反馈
 
@@ -88,9 +91,9 @@
 
 **Purpose**: 文档、真实布局和完整质量门禁
 
-- [ ] T013 [P] 在 `README.md` 说明统一筛选与文件夹折叠，在 `CHANGELOG.md` 记录本次 UI 优化
-- [ ] T014 按 `specs/023-polish-config-ui/quickstart.md` 运行 `pnpm format && pnpm check` 与 `pnpm build`
-- [ ] T015 用 Playwright 检查桌面与 320px 窄屏布局、筛选和折叠交互，确认无横向溢出并保存验证截图到 `specs/023-polish-config-ui/`
+- [x] T019 [P] 在 `README.md` 说明统一筛选与文件夹折叠，在 `CHANGELOG.md` 记录本次 UI 优化
+- [x] T020 按 `specs/023-polish-config-ui/quickstart.md` 运行 `pnpm format && pnpm check` 与 `pnpm build`
+- [ ] T021 用 Playwright 检查桌面与 320px 窄屏布局、筛选和折叠交互，确认无横向溢出并保存验证截图到 `specs/023-polish-config-ui/`
 
 ---
 
@@ -105,7 +108,7 @@
 ### Parallel Opportunities
 
 - T006 与 T007 修改不同组件，可并行。
-- T013 的文档编辑可与测试执行准备并行，但提交前统一复核。
+- T019 的文档编辑可与测试执行准备并行，但提交前统一复核。
 
 ## Parallel Example: User Story 1
 
