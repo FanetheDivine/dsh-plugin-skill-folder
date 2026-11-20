@@ -29,7 +29,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T001 [US1] 把 `package.json` 的 `@deepseek-ai/dsh-agent`、`@deepseek-ai/dsh-client-locale`、`@deepseek-ai/dsh-client-store`、`@deepseek-ai/dsh-client-ui-plugin-manager`、`@deepseek-ai/dsh-client-ui-primitives`、`@deepseek-ai/dsh-client-ui-renderer`、`@deepseek-ai/dsh-client-ui-settings`、`@deepseek-ai/dsh-client-ui-slots`、`@deepseek-ai/dsh-tools` 从 `0.2.2-rc.3` 固定为 `0.2.2-rc.5`；cordis 系依赖保持 `~4.1.0`、`~1.1.0`、`~3.19.0` 不变
+- [X] T001 [US1] 把 `package.json` 的 `@deepseek-ai/dsh-agent`、`@deepseek-ai/dsh-client-locale`、`@deepseek-ai/dsh-client-store`、`@deepseek-ai/dsh-client-ui-plugin-manager`、`@deepseek-ai/dsh-client-ui-primitives`、`@deepseek-ai/dsh-client-ui-renderer`、`@deepseek-ai/dsh-client-ui-settings`、`@deepseek-ai/dsh-client-ui-slots`、`@deepseek-ai/dsh-tools` 从 `0.2.2-rc.3` 固定为 `0.2.2-rc.5`；cordis 系依赖保持 `~4.1.0`、`~1.1.0`、`~3.19.0` 不变
 
 **Checkpoint**: 依赖声明指向 `0.2.2-rc.5`。
 
@@ -43,8 +43,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T002 [US2] 把 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude` 中 9 个条目从 `@0.2.2-rc.3` 替换为 `@0.2.2-rc.5`（depends on T001）
-- [ ] T003 [US2] 运行 `pnpm install` 重新生成 `pnpm-lock.yaml`（depends on T002）
+- [X] T002 [US2] 把 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude` 中 9 个条目从 `@0.2.2-rc.3` 替换为 `@0.2.2-rc.5`（depends on T001）
+- [X] T003 [US2] 运行 `pnpm install` 重新生成 `pnpm-lock.yaml`（depends on T002）
 
 **Checkpoint**: 安装成功，无 minimumReleaseAge 阻塞。
 
@@ -54,9 +54,9 @@
 
 **Purpose**: 质量门禁与回归验证
 
-- [ ] T004 运行 `pnpm format && pnpm check`（质量门禁，宪章原则 IV）
-- [ ] T005 运行 `pnpm full-check`，确认 typecheck、lint、`test:code`、构建、`test:dist` 零失败
-- [ ] T006 向用户汇报实机测试提醒：宿主依赖 `0.2.2-rc.3 → 0.2.2-rc.5`，按 quickstart.md 在真实 DSH 宿主上装载插件验证
+- [X] T004 运行 `pnpm format && pnpm check`（质量门禁，宪章原则 IV）
+- [X] T005 运行 `pnpm full-check`，确认 typecheck、lint、`test:code`、构建、`test:dist` 零失败
+- [X] T006 向用户汇报实机测试提醒：宿主依赖 `0.2.2-rc.3 → 0.2.2-rc.5`，按 quickstart.md 在真实 DSH 宿主上装载插件验证
 
 ---
 
