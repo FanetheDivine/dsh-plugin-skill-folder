@@ -11,11 +11,18 @@
 - `GET /api/skill-folder/skills` 路由：向配置页提供全局技能摘要与检索完整性
 - `docs/` 与 README 说明安装、分组、自动分组、搜索与加载流程
 
+### Fixed
+
+- `skill_search` 的可空输出字段改用 `oneOf` 表达，宿主的 JSON Schema 子集不接受类型数组，旧写法让插件无法激活
+- 技能列表读取中时，未分组区域显示读取提示，不再提前显示「全部技能都已分组」
+
 ### Changed
 
 - 仓库从 DSH 插件模板转化为 `dsh-plugin-skill-folder@0.1.0`，移除模板示例工具、事件日志与示例行
 - 宪章标题改为 `dsh-plugin-skill-folder Constitution`，版本升到 2.0.1
 - CI 恢复 `publish` job 的 tag 触发条件
+- 实机测试改为验证技能检索、目录折叠、技能列表路由与配置页，测试 profile 启用原生技能工具与全局技能来源
+- 单元测试的工具注册桩按宿主规则校验 JSON Schema 子集
 
 ### Removed
 

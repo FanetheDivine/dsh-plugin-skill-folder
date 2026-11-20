@@ -87,7 +87,12 @@ else
 # 实机测试隔离配置：停用真实模型，会话与存储写入 profile 目录，mock provider 由末尾 insert 加载。
 - id: $PLUGIN
   config:
-    prefix: rdt
+    folders: []
+# 被测插件只在原生 skill 加载器可见时工作：web 模板默认停用技能工具与全局技能来源
+- id: tool-skill
+  disabled: false
+- id: skill-filesystem
+  disabled: false
 - id: agent-default-model
   config:
     provider: mock

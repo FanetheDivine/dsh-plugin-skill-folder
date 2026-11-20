@@ -62,15 +62,20 @@ node run-test.mjs
 | 用例 | 断言 |
 | --- | --- |
 | A1 装载 | 插件已激活，已安装版本和 dist 哈希与仓库一致 |
-| B1 工具调用 | 请求携带 `demo_echo`，工具结果为 `[rdt] (session <id>) hello` |
-| B2 热更新 | 修改 `prefix` 后回显使用新前缀，插件实例不变 |
-| B3 关闭工具 | `demoEnabled: false` 时请求不含 `demo_echo` |
-| B4 配置错误 | 未知配置键使插件加载失败，恢复后重新激活 |
-| B5 热重载不重启 | 改 `prefix`、关开 `demoEnabled` 后 `fiber.uid` 不变，工具说明随新前缀重新注册 |
+| B1 工具定义 | 首个模型请求携带 `skill_search`，参数含 `query`、`folder`、`limit`、`offset` |
+| B2 关键词检索 | 按准确技能名查询时首位即该技能，`match` 为 `exact`，结果回显查询词 |
+| B3 文件夹检索 | `folder` 列出该文件夹全部成员，每条 `match` 为 `folder` |
+| B4 缺少参数 | 既无 `query` 也无 `folder` 时工具报错 `provide query or folder` |
+| B5 数量越界 | `limit: 99` 时工具报错 `limit must be an integer from 1 to 20` |
+| B6 目录折叠 | 配置文件夹后请求出现 `<skill_folders>`，折叠成员不在 `<available_skills>` 中 |
+| B7 空配置 | `folders: []` 时请求没有 `<skill_folders>`，技能逐项列出 |
+| B8 技能列表路由 | `GET /api/skill-folder/skills` 返回带 `complete` 与 `skills` 数组的 JSON |
+
+B2、B3、B6、B8 使用的技能名在运行时从真实全局技能里挑：取 `<available_skills>` 列出的名称与 `skills.snapshot({})` 的交集。没有全局技能时这些用例记为 SKIP 并写明原因，不计失败。
 
 mock provider 的约定：
 
-- 用户消息含 `ECHO_CASE:<文本>` 时，模型调用 `demo_echo`，再把工具结果作为回复。
+- 用户消息含 `SEARCH_CASE:<JSON 参数>` 时，模型以该参数调用 `skill_search`，再把工具结果作为回复。
 - 其他消息回复「mock：已收到」。
 - 每个请求追加到 `requests.jsonl`，用于核对请求内容。
 
@@ -96,11 +101,11 @@ mock provider 的约定：
 
 | 用例 | 操作 | 断言 |
 | --- | --- | --- |
-| C1 对话冒烟 | 在工作区输入 `ECHO_CASE:gui` 并发送 | 回复含 `mock：工具返回 [`，展开本轮后出现 `demo_echo` 工具卡片 |
-| C2 插件页 | 打开插件页 | 已安装插件列出被测插件，启用开关为开 |
-| C3 前端示例 | 在已打开的会话中查看输入区上方 | 示例行可见，点击按钮后计数递增 |
-| C4 配置页保存 | 插件页 → 包详情 → 行“配置”，改前缀并保存，再新建会话发送 `ECHO_CASE:<新前缀>` | `cordis.patch.yml` 写入新前缀，回显使用新前缀，GUI 不重启 |
-| C5 非法前缀 | 在配置页输入空白前缀 | 输入框标红并提示，保存按钮禁用，配置不变 |
+| C1 插件页 | 打开插件页 | 已安装插件列出被测插件，启用开关为开 |
+| C2 配置页 | 插件页 → 包详情 → 行“配置” | `[data-skill-folder-page]` 可见，「新建文件夹」按钮与「未分组的技能」区域渲染出来 |
+| C3 新建文件夹 | 点「新建文件夹」，在「文件夹名称」输入框填名称 | 新卡片出现，输入框取值与 `data-folder-card` 都等于输入的名称 |
+| C4 搜索选项 | 查看页面底部的「搜索选项」 | 默认返回数量与摘要长度上限存在，取值为整数，输入 `inputMode` 为数值 |
+| C5 技能条目 | 查看「未分组的技能」区域 | 技能条目来自全局技能列表路由，页面没有错误提示 |
 
 新增流程时在 `browser-test.mjs` 中加一个 `check('<编号> <名称>', fn)`。界面标签的定位依据见 [pitfalls.md](references/pitfalls.md)。
 
@@ -139,3 +144,4 @@ mock provider 的约定：
 | `RDT_SHOTS` | `<profile目录>/shots` | 截图目录 |
 | `RDT_HEADLESS` | 无头 | 设为 `0` 时显示浏览器 |
 | `RDT_KEEPALIVE` | 无 | 设为 `1` 时驱动结束后保留运行时 |
+| `RDT_PATCHED_DIST` | 无 | 设为 `1` 时跳过 A1 的 dist 哈希比对，用于在已安装副本上打临时补丁、隔离插件缺陷的影响面 |

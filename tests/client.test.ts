@@ -258,6 +258,12 @@ describe('配置页渲染', () => {
     );
   });
 
+  it('列表读取中时未分组区域不下「全部已分组」的结论', () => {
+    const html = renderPage('page', zh);
+    expect(html).not.toContain('全部技能都已分组。');
+    expect(html.match(/正在读取技能…/g)?.length).toBe(2);
+  });
+
   it('有未保存修改时显示放弃按钮', () => {
     expect(renderPage('page', zh, pageState({ dirty: true }))).toContain('放弃修改');
     expect(renderPage('page', zh)).not.toContain('放弃修改');

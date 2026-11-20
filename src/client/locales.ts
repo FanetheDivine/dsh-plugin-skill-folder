@@ -39,6 +39,7 @@ export const zh = {
   'folder.invalid': '文件夹配置有误，修正后才能保存。',
   'ungrouped.title': '未分组的技能',
   'ungrouped.empty': '全部技能都已分组。',
+  'ungrouped.unavailable': '技能列表读取失败，暂时无法显示未分组的技能。',
   'ungrouped.drop': '拖到这里移出文件夹',
   'skill.move': '移动到',
   'skill.moveToUngrouped': '未分组',
@@ -88,6 +89,8 @@ export const en: Record<FolderKey, string> = {
   'folder.invalid': 'Fix the folder settings before saving.',
   'ungrouped.title': 'Ungrouped skills',
   'ungrouped.empty': 'Every skill is grouped.',
+  'ungrouped.unavailable':
+    'The skill list could not be loaded, so ungrouped skills cannot be shown.',
   'ungrouped.drop': 'Drop here to remove from a folder',
   'skill.move': 'Move to',
   'skill.moveToUngrouped': 'Ungrouped',

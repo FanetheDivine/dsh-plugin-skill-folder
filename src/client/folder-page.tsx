@@ -113,6 +113,17 @@ function matchesFilter(name: string, description: string, filter: string): boole
   return name.toLowerCase().includes(needle) || description.toLowerCase().includes(needle);
 }
 
+/** 未分组区域为空时的提示：列表未就绪时不下「全部已分组」的结论。 */
+function ungroupedEmptyText(
+  status: SkillsState['status'],
+  filter: string,
+  t: FolderPageProps['t'],
+): string {
+  if (status === 'loading') return t('page.loading');
+  if (status === 'error') return t('ungrouped.unavailable');
+  return filter.trim() === '' ? t('ungrouped.empty') : t('filter.empty');
+}
+
 /** 未分组区域：也是一个放置区。 */
 function UngroupedArea(props: {
   names: readonly string[];
@@ -315,7 +326,7 @@ export function FolderPage(props: FolderPageProps) {
             descriptions={descriptions}
             folderNames={folderNames}
             disabled={disabled}
-            emptyText={filter.trim() === '' ? t('ungrouped.empty') : t('filter.empty')}
+            emptyText={ungroupedEmptyText(skillsState.status, filter, t)}
             t={t}
             onMove={props.moveSkill}
           />

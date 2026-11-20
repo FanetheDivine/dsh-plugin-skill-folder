@@ -1,4 +1,6 @@
 // 插件 ctx 模拟：提供 skills / tools / workingDirectory，并可直接运行 agent/pre-step 监听。
+// tools.register 与宿主一样校验 JSON Schema 子集，不合规的定义直接抛错。
+import { assertSupportedJsonSchema } from '@deepseek-ai/dsh-tools';
 import type { SkillCatalogMessage } from '../../src/catalog.ts';
 import type { SkillSummary } from '../../src/skills.ts';
 
@@ -136,7 +138,9 @@ export function makePluginCtx(options: PluginCtxOptions = {}) {
       // 注册不改变本 Agent 的可见性：只有宿主报告的工具名才可见
       get: (toolName: string) =>
         visibleTools.has(toolName) ? (findTool(toolName) ?? { name: toolName }) : undefined,
-      register: (definition: ToolStub) => {
+      register: (definition: ToolStub & { output?: { schema?: unknown } }) => {
+        assertSupportedJsonSchema(definition.parameters);
+        assertSupportedJsonSchema(definition.output?.schema);
         registeredTools.push(definition);
         activeTools.add(definition);
         return () => {

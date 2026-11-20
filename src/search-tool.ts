@@ -123,6 +123,14 @@ export function resolveArgs(
   return { query, folder, limit, offset };
 }
 
+/**
+ * 可空字符串的 schema。
+ * 宿主只接受单个 `type`，可空字段用 `oneOf` 表达。
+ */
+function nullableString(): { oneOf: { type: 'string' | 'null' }[] } {
+  return { oneOf: [{ type: 'string' }, { type: 'null' }] };
+}
+
 /** 构造 `skill_search` 工具定义。 */
 export function buildSearchTool(options: SkillSearchToolOptions) {
   return {
@@ -156,8 +164,8 @@ export function buildSearchTool(options: SkillSearchToolOptions) {
         additionalProperties: false,
         required: ['query', 'folder', 'total', 'offset', 'more', 'complete', 'results'],
         properties: {
-          query: { type: ['string', 'null'] },
-          folder: { type: ['string', 'null'] },
+          query: nullableString(),
+          folder: nullableString(),
           total: { type: 'integer' },
           offset: { type: 'integer' },
           more: { type: 'boolean' },
@@ -172,7 +180,7 @@ export function buildSearchTool(options: SkillSearchToolOptions) {
                 name: { type: 'string' },
                 description: { type: 'string' },
                 whenToUse: { type: 'string' },
-                folder: { type: ['string', 'null'] },
+                folder: nullableString(),
                 match: { type: 'string', enum: ['exact', 'partial', 'folder'] },
               },
             },
