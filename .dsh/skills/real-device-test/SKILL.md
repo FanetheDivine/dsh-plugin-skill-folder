@@ -20,7 +20,7 @@ description: 在真实 DSH 宿主上端到端测试本插件，验证插件在 D
 
 ## 阶段 0：准备
 
-1. 在仓库运行 `pnpm i && pnpm check`，确保 `dist/` 对应当前代码。
+1. 在仓库运行 `pnpm i && pnpm check`，确保 `dist/` 对应当前代码。构建是迭代动作，后续改代码只需再跑一次 `pnpm build`。
 2. 确认 `playwright` 已安装。脚本用 `channel: 'chrome'` 启动本机 Chrome，无需下载浏览器。
 
 ## 阶段 1：搭建环境（A）
@@ -36,11 +36,12 @@ bash .dsh/skills/real-device-test/scripts/setup-env.sh <仓库绝对路径> [pro
    - 全局 `dsh` 版本一致时直接使用。
    - 版本不一致时安装到 `~/.dsh-local/dsh-<版本>`，全局安装保持不变。
 2. 创建 profile，默认名为 `rdt-<日期>`。
-3. 用 `pnpm pack` 打包插件，`dsh plugin add` 安装。
+3. 用 `dsh plugin add` 以链接方式安装当前检出，`node_modules` 指向仓库。
 4. 写隔离配置 `cordis.patch.yml`：
    - 停用真实模型，加载 mock provider。
    - 会话、存储、凭据写入 profile 目录。
    - 跳过宿主的欢迎弹窗。
+   - 启用 HMR 并监听仓库 `dist`，构建后自动替换插件。
 5. 复制 `mock-provider.mjs` 与 `run-test.mjs` 到 profile 目录。
 6. 注册测试工作区。
 
@@ -61,7 +62,7 @@ node run-test.mjs
 
 | 用例 | 断言 |
 | --- | --- |
-| A1 装载 | 插件已激活，已安装版本和 dist 哈希与仓库一致 |
+| A1 装载 | 插件已激活，加载的版本和 dist 哈希与仓库一致 |
 | B1 工具定义 | 首个模型请求携带 `skill_search`，参数含 `query`、`folder`、`limit`、`offset` |
 | B2 关键词检索 | 按准确技能名查询时首位即该技能，`match` 为 `exact`，结果回显查询词 |
 | B3 文件夹检索 | `folder` 列出该文件夹全部成员，每条 `match` 为 `folder` |
@@ -78,6 +79,28 @@ mock provider 的约定：
 - 用户消息含 `SEARCH_CASE:<JSON 参数>` 时，模型以该参数调用 `skill_search`，再把工具结果作为回复。
 - 其他消息回复「mock：已收到」。
 - 每个请求追加到 `requests.jsonl`，用于核对请求内容。
+
+## 迭代：重建后在运行实例中查看效果（A、B）
+
+搭建后实例保持运行。改完插件代码，构建一次即可让同一实例加载新代码：
+
+```sh
+pnpm build        # 或 pnpm dev，持续监听 src
+```
+
+- 宿主监听仓库 `dist`，构建完成即替换后端插件；前端产物由宿主轮询后自动替换，页面无需刷新。
+- 不重装插件，不重启宿主；启动脚本只在轮次开始时执行一次。
+- 替换会重建插件实例，同一轮内重跑用例时按新实例断言。
+
+验证一次热更新：
+
+1. 记录 GUI 进程号：`netstat -ano | grep ":<端口> " | grep LISTENING`。
+2. 修改 `src/search-tool.ts` 里 `presentCall` 的卡片标题文本。
+3. 运行 `pnpm build`，等宿主替换完成。
+4. 在 GUI 里发送 `SEARCH_CASE:{"query":"skill"}`，展开工具卡片。
+5. 预期卡片标题为新文本，进程号不变。
+
+构建失败或替换失败的处理见 [pitfalls.md](references/pitfalls.md)。
 
 ## 阶段 3：浏览器用例（C）
 
@@ -122,10 +145,10 @@ mock provider 的约定：
 
 ## 阶段 5：报告与清理
 
-1. 按 [cases.md](references/cases.md) 末尾的结构写报告。
+1. 按 [cases.md](references/cases.md) 末尾的结构写报告，保存截图与结果文件。
 2. 结束 GUI 进程：用 `netstat -ano` 找到 GUI 端口的 PID，再 `taskkill //F //T //PID <pid>`。
 3. 浏览器驱动会自行关闭浏览器，无需清理页面。
-4. 保留 profile、日志与截图供复查。
+4. 删除 profile：`rm -rf <profile目录>`。下一轮重新搭建。
 
 ## 环境变量
 
