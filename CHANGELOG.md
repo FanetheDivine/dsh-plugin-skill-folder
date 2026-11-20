@@ -18,11 +18,12 @@
 
 ### Changed
 
+- 实机脚本以官方 web 默认 profile 为底本，不再覆写技能插件；驱动会话挂 `standard` preset，新增 `B0` 用例守住 preset 会话的技能目录消息
 - 宿主依赖升级：9 个 `@deepseek-ai/dsh-*` 开发依赖从 `0.2.2-rc.3` 固定到 `0.2.2-rc.5`，`pnpm-workspace.yaml` 豁免清单与锁文件同步
 - 仓库从 DSH 插件模板转化为 `dsh-plugin-skill-folder@0.1.0`，移除模板示例工具、事件日志与示例行
 - 宪章标题改为 `dsh-plugin-skill-folder Constitution`，版本升到 2.0.1
 - CI 恢复 `publish` job 的 tag 触发条件
-- 实机测试改为验证技能检索、目录折叠、技能列表路由与配置页，测试 profile 启用原生技能工具与全局技能来源
+- 实机测试改为验证技能检索、目录折叠、技能列表路由与配置页
 - 单元测试的工具注册桩按宿主规则校验 JSON Schema 子集
 
 ### Removed
