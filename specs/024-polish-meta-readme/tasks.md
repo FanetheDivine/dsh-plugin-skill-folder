@@ -44,9 +44,9 @@ description: "Task list for 024-polish-meta-readme"
 
 ## Phase 4: Polish
 
-- [ ] T012 运行 `pnpm format && pnpm check` 与 `pnpm build`
-- [ ] T013 实机验证插件行、图标、菜单与详情页，记录结果到 `specs/024-polish-meta-readme/quickstart.md`
-- [ ] T014 `CHANGELOG.md` 增加本次变更条目
+- [X] T012 运行 `pnpm format && pnpm check` 与 `pnpm build`
+- [X] T013 实机验证插件行、图标、菜单与详情页，记录结果到 `specs/024-polish-meta-readme/quickstart.md`
+- [X] T014 `CHANGELOG.md` 增加本次变更条目
 
 ## Dependencies
 
