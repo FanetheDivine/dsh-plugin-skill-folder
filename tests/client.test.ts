@@ -169,7 +169,7 @@ describe('配置页渲染', () => {
     expect(renderPage('summary', en)).toContain('Group global skills into folders');
   });
 
-  it('page 渲染工具栏、文件夹卡片与未分组区域', () => {
+  it('page 渲染工具栏、文件夹卡片、未分组区域与搜索选项', () => {
     const html = renderPage('page', zh);
     expect(html).toContain('data-skill-folder-page');
     expect(html).toContain('新建文件夹');
@@ -180,6 +180,9 @@ describe('配置页渲染', () => {
     expect(html).toContain('data-ungrouped');
     expect(html).toContain('未分组的技能');
     expect(html).toContain('正在读取技能…');
+    expect(html).toContain('data-skill-folder-options');
+    expect(html).toContain('默认返回数量');
+    expect(html).toContain('摘要长度上限');
     expect(html).toContain('保存');
   });
 
@@ -215,11 +218,38 @@ describe('配置页渲染', () => {
     expect(html).toContain('文件夹配置有误，修正后才能保存。');
   });
 
-  it('只读时禁用编辑控件', () => {
+  it('只读时禁用编辑控件与保存', () => {
     const html = renderPage('page', zh, pageState({ writable: false }));
     expect(html).toContain('此部署以只读方式保存设置。');
     expect(html).toMatch(/<button[^>]*disabled[^>]*>新建文件夹/);
     expect(html).toMatch(/<input[^>]*aria-label="文件夹名称"[^>]*disabled/);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>保存/);
+  });
+
+  it('数量越界时显示字段错误并阻止保存', () => {
+    const html = renderPage(
+      'page',
+      zh,
+      pageState({ invalid: true, defaultLimit: { text: '99', overridden: true, invalid: true } }),
+    );
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>保存/);
+  });
+
+  it('保存失败时显示提示并保留草稿', () => {
+    const html = renderPage('page', zh, pageState({ dirty: true, failed: true }));
+    expect(html).toContain('此部署未接受这些值，已保留以便修改。');
+    expect(html).toContain('value="lark"');
+  });
+
+  it('已覆盖的字段显示恢复默认', () => {
+    const html = renderPage(
+      'page',
+      zh,
+      pageState({ defaultLimit: { text: '7', overridden: true, invalid: false } }),
+    );
+    expect(html).toContain('已覆盖');
+    expect(html).toContain('恢复默认');
   });
 
   it('命名空间未下发时显示不可用文案', () => {

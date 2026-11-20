@@ -235,3 +235,29 @@ describe('全局技能路由', () => {
     expect(ctx._routes).toEqual([]);
   });
 });
+
+describe('检索选项热更新', () => {
+  it('保存后新摘要长度作用于检索结果', async () => {
+    const long = [
+      {
+        name: 'chrome-devtools',
+        description: '长'.repeat(500),
+        invocation: { modelInvocable: true, userInvocable: true },
+        source: 'user-agents',
+        provider: 'filesystem',
+        path: 'C:/Users/me/.agents/skills/chrome-devtools/SKILL.md',
+      },
+    ];
+    const ctx = makePluginCtx({ skills: long });
+    const descriptionMaxLength = volatile(320);
+    apply(ctx as never, { descriptionMaxLength });
+    descriptionMaxLength.set(40);
+    ctx._emit('loader/volatile-update', [['descriptionMaxLength']]);
+    const tool = ctx._registeredTools.filter((entry) => entry.name === 'skill_search').at(-1);
+    const result = (await tool?.execute(
+      { query: 'chrome-devtools' },
+      { agent: { id: 'a' }, signal: new AbortController().signal },
+    )) as { results: { description: string }[] } | undefined;
+    expect(Array.from(result?.results[0]?.description ?? '')).toHaveLength(40);
+  });
+});

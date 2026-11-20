@@ -7,7 +7,7 @@
 // Type-only：拉取 plugins.row.config 槽位声明。
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
 import type { SettingsFormLabels } from '@deepseek-ai/dsh-client-ui-primitives';
-import { SettingsForm } from '@deepseek-ai/dsh-client-ui-primitives';
+import { SettingsForm, SettingsValueField } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import {
   DndContext,
@@ -18,7 +18,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 
 import type { FolderConfig } from '../config.ts';
 import { UNGROUPED_ID } from '../constants.ts';
@@ -34,6 +34,7 @@ import {
   cardActiveStyle,
   cardStyle,
   chipListStyle,
+  dividerStyle,
   errorStyle,
   hintStyle,
   inputStyle,
@@ -163,6 +164,7 @@ function UngroupedArea(props: {
  */
 export function FolderPage(props: FolderPageProps) {
   const { t } = props;
+  const id = useId();
   const form = props.useConfigForm((value) => value);
   const { state: skillsState, retry } = useSkills(props.loadSkills);
   const [filter, setFilter] = useState('');
@@ -318,6 +320,48 @@ export function FolderPage(props: FolderPageProps) {
             onMove={props.moveSkill}
           />
         </DndContext>
+
+        <div style={{ ...dividerStyle, paddingTop: 12 }} data-skill-folder-options>
+          <h3 style={sectionTitleStyle}>{t('options.title')}</h3>
+          <SettingsValueField
+            id={`${id}-default-limit`}
+            label={t('options.defaultLimit')}
+            hint={t('options.defaultLimitHint')}
+            invalidLabel={t('options.defaultLimitHint')}
+            overriddenLabel={t('page.overridden')}
+            resetLabel={t('page.reset')}
+            text={form.defaultLimit.text}
+            overridden={form.defaultLimit.overridden}
+            invalid={form.defaultLimit.invalid}
+            disabled={disabled}
+            numeric
+            onEdit={(text) => {
+              props.edit('defaultLimit', text);
+            }}
+            onReset={() => {
+              props.resetField('defaultLimit');
+            }}
+          />
+          <SettingsValueField
+            id={`${id}-description-max`}
+            label={t('options.descriptionMaxLength')}
+            hint={t('options.descriptionMaxLengthHint')}
+            invalidLabel={t('options.descriptionMaxLengthHint')}
+            overriddenLabel={t('page.overridden')}
+            resetLabel={t('page.reset')}
+            text={form.descriptionMaxLength.text}
+            overridden={form.descriptionMaxLength.overridden}
+            invalid={form.descriptionMaxLength.invalid}
+            disabled={disabled}
+            numeric
+            onEdit={(text) => {
+              props.edit('descriptionMaxLength', text);
+            }}
+            onReset={() => {
+              props.resetField('descriptionMaxLength');
+            }}
+          />
+        </div>
       </div>
     </SettingsForm>
   );
