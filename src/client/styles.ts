@@ -361,15 +361,30 @@ export const srOnlyStyle: CSSProperties = {
   border: 0,
 };
 
-/** 「移动到」下拉框。 */
-export const selectStyle: CSSProperties = {
+/** 「移动到」菜单的触发按钮：显示当前分组与下拉箭头。 */
+export const moveTriggerStyle: CSSProperties = {
+  display: 'inline-flex',
+  flexShrink: 0,
+  alignItems: 'center',
+  gap: 2,
   height: 20,
-  maxWidth: 96,
+  maxWidth: 112,
+  padding: '0 4px 0 6px',
   border: 'none',
-  background: 'transparent',
+  borderRadius: 4,
+  background: 'var(--dsw-alias-bg-layer-1)',
   color: 'var(--dsw-alias-label-secondary)',
+  font: 'inherit',
   fontSize: 11,
   cursor: 'pointer',
+};
+
+/** 触发按钮内的分组名：超长时省略。 */
+export const moveTriggerLabelStyle: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 /** 区块分隔：0.5px 的 l2 分隔线。 */
@@ -389,15 +404,18 @@ export const optionsGridStyle: CSSProperties = {
 export const focusStyleText = `
   [data-skill-folder-page] button:focus-visible,
   [data-skill-folder-page] input:focus-visible,
-  [data-skill-folder-page] select:focus-visible,
   [data-skill-folder-page] [data-skill-drag-handle]:focus-visible {
     outline: 2px solid var(--dsw-alias-brand-primary);
     outline-offset: 2px;
   }
   [data-skill-folder-page] button:disabled,
-  [data-skill-folder-page] input:disabled,
-  [data-skill-folder-page] select:disabled {
+  [data-skill-folder-page] input:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+  }
+  [data-skill-folder-page] [data-skill-move]:not(:disabled):hover,
+  [data-skill-folder-page] [data-skill-move][aria-expanded='true'] {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
   }
 `;

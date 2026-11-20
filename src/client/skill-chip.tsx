@@ -1,10 +1,13 @@
 /**
- * 技能条目：可拖拽，并提供「移动到」下拉框作为键盘与非拖拽操作的替代。
- * 导出 SkillChip 与其 props。
+ * 技能条目：可拖拽，并提供「移动到」菜单作为键盘与非拖拽操作的替代。
+ * 导出 SkillChip、其 props 与菜单项构造函数 moveMenuEntries。
  */
 
+import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives';
+import { IconChevronDownOutlineRegular, Menu } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import { useDraggable } from '@dnd-kit/core';
+import { useState } from 'react';
 import type { NS } from './locales.ts';
 import {
   chipNameStyle,
@@ -12,11 +15,62 @@ import {
   dragHandleStyle,
   dragIconStyle,
   missingChipStyle,
-  selectStyle,
+  moveTriggerLabelStyle,
+  moveTriggerStyle,
 } from './styles.ts';
 
-/** 下拉框中「未分组」选项的值。 */
-const UNGROUPED_VALUE = '';
+/** 菜单中「未分组」项的 id。 */
+export const UNGROUPED_ID = 'ungrouped';
+
+/** 文件夹菜单项 id 的前缀，后接文件夹下标，避免与任意文件夹名冲突。 */
+const FOLDER_ID_PREFIX = 'folder:';
+
+/**
+ * 构造「移动到」菜单项：标题、未分组、分隔线与全部文件夹。
+ * @param folders - 全部文件夹名。
+ * @param t - 字典。
+ * @returns 菜单数据行。
+ */
+export function moveMenuEntries(
+  folders: readonly string[],
+  t: TranslateNS<typeof NS>,
+): MenuEntry[] {
+  const entries: MenuEntry[] = [
+    { type: 'label', id: 'move-label', text: t('skill.move') },
+    { id: UNGROUPED_ID, label: t('skill.moveToUngrouped') },
+  ];
+  if (folders.length > 0) entries.push({ type: 'separator', id: 'move-separator' });
+  folders.forEach((folder, index) => {
+    entries.push({
+      id: `${FOLDER_ID_PREFIX}${String(index)}`,
+      label: folder === '' ? t('skill.untitledFolder') : folder,
+    });
+  });
+  return entries;
+}
+
+/**
+ * 把菜单项 id 还原为目标文件夹。
+ * @param id - 被选中的菜单项 id。
+ * @param folders - 全部文件夹名。
+ * @returns 文件夹名，未分组为 null，无法识别时为 undefined。
+ */
+export function moveTargetOf(id: string, folders: readonly string[]): string | null | undefined {
+  if (id === UNGROUPED_ID) return null;
+  if (!id.startsWith(FOLDER_ID_PREFIX)) return undefined;
+  return folders[Number(id.slice(FOLDER_ID_PREFIX.length))];
+}
+
+/**
+ * 计算当前归属对应的菜单项 id。
+ * @param folder - 当前所属文件夹名，未分组为 null。
+ * @param folders - 全部文件夹名。
+ * @returns 菜单项 id。
+ */
+export function moveSelectedId(folder: string | null, folders: readonly string[]): string {
+  const index = folder === null ? -1 : folders.indexOf(folder);
+  return index < 0 ? UNGROUPED_ID : `${FOLDER_ID_PREFIX}${String(index)}`;
+}
 
 /** 技能条目 props。 */
 export interface SkillChipProps {
@@ -44,12 +98,19 @@ export interface SkillChipProps {
  * @returns 可拖拽的条目。
  */
 export function SkillChip(props: SkillChipProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
     useDraggable({
       id: props.name,
       disabled: props.disabled || props.missing === true,
       data: { folder: props.folder },
     });
+  const currentLabel =
+    props.folder === null
+      ? props.t('skill.moveToUngrouped')
+      : props.folder === ''
+        ? props.t('skill.untitledFolder')
+        : props.folder;
   const style = {
     ...(props.missing === true ? missingChipStyle : chipStyle),
     ...(transform === null
@@ -78,31 +139,52 @@ export function SkillChip(props: SkillChipProps) {
         </span>
         <span style={{ ...chipNameStyle, minWidth: 0 }}>{props.name}</span>
       </button>
-      <select
-        aria-label={`${props.t('skill.move')} ${props.name}`}
-        data-skill-move={props.name}
-        style={{ ...selectStyle, flexShrink: 0 }}
-        value={props.folder ?? UNGROUPED_VALUE}
-        disabled={props.disabled}
-        // 下拉框交互时不触发拖拽
-        onPointerDown={(event) => {
-          event.stopPropagation();
+      <Menu
+        open={menuOpen && !props.disabled}
+        portal
+        autoFocus
+        dense
+        align="end"
+        items={moveMenuEntries(props.folders, props.t)}
+        selectedId={moveSelectedId(props.folder, props.folders)}
+        onClose={() => {
+          setMenuOpen(false);
         }}
-        onKeyDown={(event) => {
-          event.stopPropagation();
+        onSelect={(id) => {
+          setMenuOpen(false);
+          const target = moveTargetOf(id, props.folders);
+          if (target !== undefined && target !== props.folder) props.onMove(props.name, target);
         }}
-        onChange={(event) => {
-          const value = event.target.value;
-          props.onMove(props.name, value === UNGROUPED_VALUE ? null : value);
-        }}
-      >
-        <option value={UNGROUPED_VALUE}>{props.t('skill.moveToUngrouped')}</option>
-        {props.folders.map((folder) => (
-          <option key={folder} value={folder}>
-            {folder}
-          </option>
-        ))}
-      </select>
+        anchor={
+          <button
+            type="button"
+            style={moveTriggerStyle}
+            aria-label={`${props.t('skill.move')} ${props.name}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            title={currentLabel}
+            data-skill-move={props.name}
+            disabled={props.disabled}
+            // 菜单交互时不触发拖拽
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={() => {
+              setMenuOpen((open) => !open);
+            }}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (!menuOpen && event.key === 'ArrowDown') {
+                event.preventDefault();
+                setMenuOpen(true);
+              }
+            }}
+          >
+            <span style={moveTriggerLabelStyle}>{currentLabel}</span>
+            <IconChevronDownOutlineRegular size={12} />
+          </button>
+        }
+      />
     </span>
   );
 }

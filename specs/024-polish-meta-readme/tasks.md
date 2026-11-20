@@ -28,11 +28,11 @@ description: "Task list for 024-polish-meta-readme"
 
 **Independent Test**: `pnpm vitest run tests/client.test.ts` 通过；实机键盘与鼠标均可切换分组。
 
-- [ ] T006 [US2] `tests/support/primitives.ts` 导出 `Menu`、`MenuItemButton` 与 `IconChevronDownOutlineRegular`
-- [ ] T007 [US2] `src/client/skill-chip.tsx` 用 `Menu` 替换 `<select>`：触发按钮显示当前分组名与下拉箭头，`portal`，`selectedId` 标记当前分组，未分组项后加分隔线，选中后关闭，阻止 `pointerdown` 与 `keydown` 冒泡
-- [ ] T008 [US2] `src/client/styles.ts` 增加触发按钮样式，长名称省略
-- [ ] T009 [US2] 更新 `tests/client.test.ts` 的「移动到」断言为菜单触发按钮语义
-- [ ] T010 [US2] 同步 `docs/development.md` 文件地图与 `docs/known-risks.md` 的下拉框描述
+- [X] T006 [US2] `tests/support/primitives.ts` 导出 `Menu`、`MenuItemButton` 与 `IconChevronDownOutlineRegular`
+- [X] T007 [US2] `src/client/skill-chip.tsx` 用 `Menu` 替换 `<select>`：触发按钮显示当前分组名与下拉箭头，`portal`，`selectedId` 标记当前分组，未分组项后加分隔线，选中后关闭，阻止 `pointerdown` 与 `keydown` 冒泡
+- [X] T008 [US2] `src/client/styles.ts` 增加触发按钮样式，长名称省略
+- [X] T009 [US2] 更新 `tests/client.test.ts` 的「移动到」断言为菜单触发按钮语义
+- [X] T010 [US2] 同步 `docs/development.md` 文件地图与 `docs/known-risks.md` 的下拉框描述
 
 ## Phase 3: User Story 3 - 阅读 README 了解用法 (Priority: P3)
 
