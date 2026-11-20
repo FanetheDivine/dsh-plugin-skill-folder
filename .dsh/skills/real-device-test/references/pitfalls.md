@@ -26,6 +26,7 @@
 | `fiber.assertActive()` 在 `apply` 抛错时仍通过 | 它只检查插件是否已卸载 | 用 `entry.fiber.state` 判断：`2` 已激活，`3` 加载失败 |
 | 工作区报 `missing or foreign unit header`，会话控制器等服务一直等待 | `workspace.json` 的 `version` 写在了顶层 | 写成 `unit: { name: 'workspace', version: 2 }` |
 | GUI 停在「正在加载工作区」 | `workspace.json` 的路径或时间戳格式错误 | `path` 用反斜杠 Windows 路径，时间戳用 ISO 字符串 |
+| 会话没有 `<available_skills>`，`skill` 与 `skill_search` 仍在工具列表 | 根作用域启用了 `tool-skill`，它的目录监听删掉了 preset 加入的目录消息 | 停用根作用域 `tool-skill`，技能工具交由 agent preset 提供；见 `docs/known-risks.md` |
 | 多次运行报 `SessionAlreadyExistsError` | 固定 sessionId 与上轮落盘会话冲突 | `run-test.mjs` 启动时清理 `test-sessions` |
 | 驱动找不到 `lib/profile-boot.js` | 旧版宿主只提供带 hash 的文件名 | `run-test.mjs` 按导出的 `runProfile` 查找 |
 

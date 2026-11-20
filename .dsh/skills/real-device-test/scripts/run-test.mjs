@@ -26,6 +26,9 @@ for (const f of ['test-sessions', 'requests.jsonl', 'results.json', 'fatal.txt']
 
 const require = createRequire(dshPkg);
 const { createUserMessage } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-llm')));
+const { installModelSelection } = await import(
+  pathToFileURL(require.resolve('@deepseek-ai/dsh-agent'))
+);
 const { createLaunchEnvironmentSnapshot } = await import(
   pathToFileURL(require.resolve('@deepseek-ai/dsh-launch-environment'))
 );
@@ -73,12 +76,34 @@ async function config(patch = {}) {
   await app.loader.await();
 }
 
-/** 用 mock 模型创建会话。 */
+/** 会话使用的 agent preset：与 GUI 会话同形，技能工具与技能来源由它提供。 */
+let presetSession;
+
+/** 读取 preset 服务并解析 `standard`；宿主缺少该服务时说明版本不匹配。 */
+async function standardPreset() {
+  if (presetSession === undefined) {
+    const presets = app.get('agentPresets');
+    if (presets === undefined) {
+      throw new Error(
+        '宿主缺少 agentPresets 服务，无法挂 standard preset；请确认宿主版本与 package.json 的 @deepseek-ai/dsh-agent 一致',
+      );
+    }
+    presetSession = { presets, preset: await presets.resolve('standard') };
+  }
+  return presetSession;
+}
+
+/** 用 mock 模型创建会话，挂载与 GUI 一致的 standard preset。 */
 async function create(id) {
+  const { presets, preset } = await standardPreset();
   const h = await app.agents.create({
     sessionId: id,
     meta: { cwd: REPO },
     agentOptions: { provider: 'mock', model: 'mock-model' },
+    setup: async (agentCtx) => {
+      installModelSelection(agentCtx);
+      await presets.mount(agentCtx, preset.id);
+    },
   });
   handles.push(h);
   return h.agent;
@@ -216,6 +241,30 @@ try {
     return { version: version(installed), sha };
   });
   if (results.at(-1)?.status !== 'PASS') throw new Error('装载失败，中止后续用例');
+
+  await check('B0 preset 会话包含技能目录消息', async () => {
+    await config();
+    const a = await create('rdt-shape');
+    const calls = await turn(a, '实机测试：请回复');
+    const tools = (calls[0]?.tools ?? []).map((t) => t.name);
+    assert(tools.includes('skill'), '首个请求缺少 skill 工具，standard preset 未挂上');
+    assert(tools.includes(TOOL_NAME), `首个请求缺少 ${TOOL_NAME}，插件未注册检索工具`);
+    const catalogs = typed(a, 'user/message').filter(
+      (e) => e.data.source?.kind === 'skill-catalog',
+    );
+    assert.equal(
+      catalogs.length,
+      1,
+      `会话应有 1 条技能目录消息，实际 ${catalogs.length}；根作用域启用 tool-skill 会删掉 preset 的目录`,
+    );
+    const catalog = catalogOf(calls);
+    assert(catalog.available !== undefined, '请求中没有 <available_skills> 目录');
+    return {
+      tools: tools.filter((name) => /skill/.test(name)),
+      catalogSeq: catalogs[0].seq,
+      listed: catalog.names.length,
+    };
+  });
 
   await check('B1 首个请求携带 skill_search 工具定义', async () => {
     await config();

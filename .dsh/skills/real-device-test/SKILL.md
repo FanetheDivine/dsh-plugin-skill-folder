@@ -35,7 +35,7 @@ bash .dsh/skills/real-device-test/scripts/setup-env.sh <仓库绝对路径> [pro
    - 期望版本取 `package.json` 中 `@deepseek-ai/dsh-agent` 的版本，`RDT_DSH_VERSION` 可覆盖。
    - 全局 `dsh` 版本一致时直接使用。
    - 版本不一致时安装到 `~/.dsh-local/dsh-<版本>`，全局安装保持不变。
-2. 创建 profile，默认名为 `rdt-<日期>`。
+2. 创建 profile，默认名为 `rdt-<日期>`。底本为宿主官方 web 默认 profile（`--from-default-profile web`），不覆写技能插件：技能工具与来源由该底本的 `standard` agent preset 提供。
 3. 用 `dsh plugin add` 以链接方式安装当前检出，`node_modules` 指向仓库。
 4. 写隔离配置 `cordis.patch.yml`：
    - 停用真实模型，加载 mock provider。
@@ -55,6 +55,7 @@ node run-test.mjs
 ```
 
 - 驱动用宿主的 `runProfile` 启动 profile，以会话落盘事件作为断言依据。
+- 驱动创建的会话挂 `standard` preset，形态与 GUI 会话一致。
 - 结果写入 `results.json`。全部通过时退出码为 0。
 - 首个用例检查装载。装载失败时中止后续用例。
 
@@ -63,6 +64,7 @@ node run-test.mjs
 | 用例 | 断言 |
 | --- | --- |
 | A1 装载 | 插件已激活，加载的版本和 dist 哈希与仓库一致 |
+| B0 会话形态 | 请求携带 preset 提供的 `skill` 工具，会话存在技能目录消息，请求含 `<available_skills>` |
 | B1 工具定义 | 首个模型请求携带 `skill_search`，参数含 `query`、`folder`、`limit`、`offset` |
 | B2 关键词检索 | 按准确技能名查询时首位即该技能，`match` 为 `exact`，结果回显查询词 |
 | B3 文件夹检索 | `folder` 列出该文件夹全部成员，每条 `match` 为 `folder` |

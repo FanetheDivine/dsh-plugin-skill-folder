@@ -36,6 +36,15 @@ pnpm 的 minimum release age 策略会拒绝发布时间过短的包。
 - 原生首句与加载指引的措辞会变化；本插件替换为正则无关的固定文本，不解析原生措辞。
 - `skill-catalog` 来源类型变化时，目录不再折叠，`skill_search` 仍可用。
 
+## 根作用域技能插件与 agent preset 冲突
+
+GUI 会话使用 agent preset，preset 自带 `tool-skill` 与 `skill-filesystem` 实例。
+
+- 在根作用域再启用 `tool-skill` 时，根实例判断本 Agent 的 `skill` 工具与自己的不同实例，按「没有技能」处理并删除 preset 已加入的目录消息。
+- 现象：会话没有 `<available_skills>`，`skill` 与 `skill_search` 仍在工具列表中，插件停用后同样缺失。
+- 副本 profile 只需停用根作用域的 `tool-skill`；技能工具与技能来源由 preset 提供。
+- 实机脚本以官方 web 默认 profile 为底本，不覆写这两个插件，用例 `B0` 守住该形态。
+
 ## 触屏与拖拽
 
 - `@dnd-kit/core` 的指针传感器按鼠标与触控笔设计；触屏可长按拖动，也可能被页面滚动打断。
