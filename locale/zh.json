@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "技能文件夹",
-    "description": "把全局技能归入文件夹，模型目录只显示文件夹的名称、简介与数量，折叠的成员通过 skill_search 检索后用 skill 加载。支持拖拽分组、按前缀自动分组与保存后生效。"
+    "title": "折叠skill",
+    "description": "可视化地对全局skill进行分组折叠，避免会话一次性加载全部skill"
   }
 }

@@ -183,6 +183,7 @@ spec 与 plan 模板包含状态、待确认决策、澄清记录和审查记录
 
 ```text
 cordis.patch.yml            # 插件行，dsh plugin add 时插入 profile
+icon.svg                    # 插件图标，经 package.json 的 ./icon 导出
 src/
 ├── index.ts                # 宿主入口：导出 name、inject、apply、Config
 ├── config.ts               # Config schema、默认值、严格校验与实时读取
@@ -202,7 +203,7 @@ src/
     ├── folder-form.ts      # 配置页草稿模型与行键常量
     ├── folder-page.tsx     # 配置页视图与拖拽上下文
     ├── folder-card.tsx     # 文件夹卡片与放置区
-    ├── skill-chip.tsx      # 可拖拽技能条目与「移动到」下拉框
+    ├── skill-chip.tsx      # 可拖拽技能条目与「移动到」菜单
     ├── styles.ts           # 只引用主题令牌的内联样式
     └── locales.ts          # 中英文字典与命名空间
 dist/
