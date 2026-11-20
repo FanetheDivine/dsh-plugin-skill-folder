@@ -36,7 +36,7 @@ describe('apply 接线', () => {
   });
 
   it('看不到 skill_search 时原样返回', async () => {
-    const ctx = makePluginCtx({ tools: [] });
+    const ctx = makePluginCtx({ tools: ['skill'] });
     apply(ctx as never, {});
     const decision = { kind: 'enter' as const, messages: [ctx.catalog] };
     const result = await ctx._runPreStep({ agent: { id: 'a' } }, async () => decision);
@@ -87,6 +87,63 @@ describe('apply 接线', () => {
     const result = await ctx._runPreStep({ agent: { id: 'a' } }, async () => decision);
     expect(result).toBe(decision);
     expect(ctx._loggerCalls.some((call) => call.level === 'warn')).toBe(true);
+  });
+});
+
+describe('检索工具注册', () => {
+  it('注册 skill_search，参数说明中的默认数量来自配置', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { defaultLimit: 9 });
+    const tool = ctx._registeredTools.find((entry) => entry.name === 'skill_search');
+    expect(tool).toBeDefined();
+    expect(tool?.parameters?.properties?.limit?.description).toContain('default 9');
+  });
+
+  it('卸载时注销工具', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    expect(ctx._hasTool('skill_search')).toBe(true);
+    ctx._dispose();
+    expect(ctx._hasTool('skill_search')).toBe(false);
+  });
+
+  it('配置更新后按新默认数量重新注册', () => {
+    const ctx = makePluginCtx();
+    const defaultLimit = volatile(5);
+    apply(ctx as never, { defaultLimit });
+    defaultLimit.set(11);
+    ctx._emit('loader/volatile-update', [['defaultLimit']]);
+    const active = [...ctx._activeTools].filter((entry) => entry.name === 'skill_search');
+    expect(active).toHaveLength(1);
+    expect(active[0]?.parameters?.properties?.limit?.description).toContain('default 11');
+  });
+
+  it('工具按当前文件夹检索，并透传检索完整性', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {
+      folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }],
+    });
+    const tool = ctx._registeredTools.find((entry) => entry.name === 'skill_search');
+    const result = await tool?.execute(
+      { folder: 'lark' },
+      { agent: { id: 'a' }, signal: new AbortController().signal },
+    );
+    expect(result).toMatchObject({ folder: 'lark', total: 1, complete: true });
+    expect(result?.results).toHaveLength(1);
+    expect(result?.results?.[0]).toMatchObject({
+      name: 'lark-doc',
+      folder: 'lark',
+      match: 'folder',
+    });
+  });
+
+  it('原生加载器不可用时工具报错', async () => {
+    const ctx = makePluginCtx({ tools: ['skill_search'] });
+    apply(ctx as never, { folders: [] });
+    const tool = ctx._registeredTools.find((entry) => entry.name === 'skill_search');
+    await expect(tool?.execute({ query: 'lark' }, { agent: { id: 'a' } })).rejects.toThrow(
+      'skill loader',
+    );
   });
 });
 

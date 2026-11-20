@@ -4,6 +4,7 @@
 import { foldCatalog, type SkillCatalogMessage } from './catalog.ts';
 import { type PluginConfig, readConfig } from './config.ts';
 import { PLUGIN_LABEL, TOOL_NAME } from './constants.ts';
+import { buildSearchTool } from './search-tool.ts';
 import type { SkillSummary } from './skills.ts';
 import type { Context } from './types.ts';
 
@@ -29,6 +30,8 @@ interface SkillsService {
 interface ToolsService {
   /** 按名称与作用域读取工具定义。 */
   get: (toolName: string, scope?: object) => { readonly name?: string } | undefined;
+  /** 注册工具定义。 */
+  register: (definition: object) => () => void;
 }
 
 /** 宿主 `workingDirectory` 服务的最小面。 */
@@ -64,7 +67,40 @@ export function apply(ctx: Context, config?: unknown): void {
   const services = ctx as unknown as PluginServices;
   services.logger.info?.(`[${PLUGIN_LABEL}] apply: folders=${String(current.folders.length)}`);
 
-  // 目录改写：`prepend` 让本监听位于原生目录监听之外，next() 返回时目录消息已生成
+  /** 读取本 Agent 的技能快照。 */
+  const readSkills = async (context: { agent?: unknown; signal?: AbortSignal | undefined }) => {
+    const agent = context.agent as object | undefined;
+    const cwd = await services.workingDirectory?.ensure(agent ?? {}, context.signal);
+    const snapshot = await services.skills?.snapshot({
+      cwd,
+      scope: agent,
+      signal: context.signal,
+    });
+    if (snapshot === undefined) throw new Error(`${PLUGIN_LABEL}: skills service unavailable`);
+    return snapshot;
+  };
+
+  /** 按当前配置注册检索工具，返回注销函数。 */
+  const registerTool = () => {
+    const tool = buildSearchTool({
+      folders: current.folders,
+      defaultLimit: current.defaultLimit,
+      descriptionMaxLength: current.descriptionMaxLength,
+      readSkills,
+      hasSkillLoader: (context) =>
+        services.tools?.get('skill', context.agent as object) !== undefined,
+    });
+    return services.tools?.register(tool) ?? (() => undefined);
+  };
+
+  let disposeTool = registerTool();
+  ctx.effect(
+    () => () => {
+      disposeTool();
+    },
+    `${PLUGIN_LABEL}: search tool`,
+  );
+
   ctx.effect(
     () =>
       ctx.on(
@@ -102,11 +138,15 @@ export function apply(ctx: Context, config?: unknown): void {
   ctx.on('loader/volatile-update', () => {
     try {
       current = readConfig(config);
-      services.logger.info?.(
-        `[${PLUGIN_LABEL}] config updated: folders=${String(current.folders.length)}`,
-      );
     } catch (error) {
       services.logger.warn?.(`[${PLUGIN_LABEL}] config update ignored: ${String(error)}`);
+      return;
     }
+    // 工具说明中的默认数量来自配置，重新注册以同步
+    disposeTool();
+    disposeTool = registerTool();
+    services.logger.info?.(
+      `[${PLUGIN_LABEL}] config updated: folders=${String(current.folders.length)}`,
+    );
   });
 }
