@@ -100,11 +100,8 @@ else
 - id: hmr
   config:
     root: ["$REPO/dist"]
-# 被测插件只在原生 skill 加载器可见时工作：web 模板默认停用技能工具与全局技能来源
-- id: tool-skill
-  disabled: false
-- id: skill-filesystem
-  disabled: false
+# 技能工具与技能来源由官方 web 默认 profile 的 agent preset 提供；在根作用域再启用
+# tool-skill 会让 preset 会话丢失技能目录消息，见 docs/known-risks.md。
 - id: agent-default-model
   config:
     provider: mock
