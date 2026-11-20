@@ -24,6 +24,7 @@ import type { FolderConfig } from '../config.ts';
 import { UNGROUPED_ID } from '../constants.ts';
 import { ungroupedOf, validateFolders } from '../folders.ts';
 import type { SkillItem, SkillsPayload } from './api.ts';
+import { autoGroup } from './auto-group.ts';
 import { FolderCard, folderDropId } from './folder-card.tsx';
 import { coerceFolders, type FolderPageInjected } from './folder-form.ts';
 import type { NS } from './locales.ts';
@@ -229,6 +230,22 @@ export function FolderPage(props: FolderPageProps) {
             }}
           >
             {t('folder.create')}
+          </button>
+          <button
+            type="button"
+            style={buttonStyle}
+            disabled={disabled || skillsState.status !== 'ready'}
+            onClick={() => {
+              props.replaceFolders(
+                autoGroup(
+                  folders,
+                  skills.map((skill) => skill.name),
+                  (prefix) => t('autoGroup.description', { prefix }),
+                ),
+              );
+            }}
+          >
+            {t('autoGroup.label')}
           </button>
           <input
             aria-label={t('filter.label')}

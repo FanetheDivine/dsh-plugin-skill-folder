@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { parseSkillsPayload } from '../src/client/api.ts';
+import { autoGroup as autoGroupFolders } from '../src/client/auto-group.ts';
 import { type FolderFormState, ROW_ID, ROW_KEY } from '../src/client/folder-form.ts';
 import { FolderPage } from '../src/client/folder-page.tsx';
 import * as clientEntry from '../src/client/index.ts';
@@ -248,5 +249,33 @@ describe('技能列表响应', () => {
 
   it('结构不符时报错', () => {
     expect(() => parseSkillsPayload({ nope: 1 })).toThrow('unexpected skills response');
+  });
+});
+
+describe('按前缀自动分组', () => {
+  it('页面渲染自动分组按钮', () => {
+    expect(renderPage('page', zh)).toContain('按前缀自动分组');
+    expect(renderPage('page', en)).toContain('Group by prefix');
+  });
+
+  it('把未分组技能按前缀写入文件夹，简介按当前语言生成', () => {
+    expect(
+      autoGroupFolders([], ['lark-a', 'lark-b', 'x-c'], (prefix) => `${prefix} 系列技能`),
+    ).toEqual([{ name: 'lark', description: 'lark 系列技能', skills: ['lark-a', 'lark-b'] }]);
+  });
+
+  it('保留已分组技能的归属与现有文件夹顺序', () => {
+    const result = autoGroupFolders(
+      [
+        { name: 'keep', description: '保留', skills: ['lark-a'] },
+        { name: 'lark', description: '', skills: [] },
+      ],
+      ['lark-a', 'lark-b', 'lark-c'],
+      (prefix) => prefix,
+    );
+    expect(result.map((folder) => [folder.name, folder.skills])).toEqual([
+      ['keep', ['lark-a']],
+      ['lark', ['lark-b', 'lark-c']],
+    ]);
   });
 });
