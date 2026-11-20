@@ -93,7 +93,7 @@
 
 - [x] T019 [P] 在 `README.md` 说明统一筛选与文件夹折叠，在 `CHANGELOG.md` 记录本次 UI 优化
 - [x] T020 按 `specs/023-polish-config-ui/quickstart.md` 运行 `pnpm format && pnpm check` 与 `pnpm build`
-- [ ] T021 用 Playwright 检查桌面与 320px 窄屏布局、筛选和折叠交互，确认无横向溢出并保存验证截图到 `specs/023-polish-config-ui/`
+- [x] T021 用 Playwright 检查桌面与 320px 窄屏布局、筛选和折叠交互，确认无横向溢出并保存验证截图到 `specs/023-polish-config-ui/`
 
 ---
 

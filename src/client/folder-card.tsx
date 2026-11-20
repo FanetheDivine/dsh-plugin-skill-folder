@@ -181,7 +181,7 @@ export function FolderCard(props: FolderCardProps) {
       />
       <div
         id={`${id}-members`}
-        style={chipListStyle}
+        style={props.collapsed ? { ...chipListStyle, display: 'none' } : chipListStyle}
         data-folder-members={folder.name}
         hidden={props.collapsed}
       >
