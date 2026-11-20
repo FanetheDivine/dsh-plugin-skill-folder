@@ -40,7 +40,7 @@ description: "Task list for 024-polish-meta-readme"
 
 **Independent Test**: 通读 README，顶部有 npm 版本徽章，无开发章节。
 
-- [ ] T011 [US3] 重写 `README.md`：npm 版本徽章、功能、安装、使用、配置、工具；删除开发章节与算法细节
+- [X] T011 [US3] 重写 `README.md`：npm 版本徽章、功能、安装、使用、配置、工具；删除开发章节与算法细节
 
 ## Phase 4: Polish
 
