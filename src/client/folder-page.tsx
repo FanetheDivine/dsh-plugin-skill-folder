@@ -30,16 +30,29 @@ import { coerceFolders, type FolderPageInjected } from './folder-form.ts';
 import type { NS } from './locales.ts';
 import { SkillChip } from './skill-chip.tsx';
 import {
+  badgeStyle,
   buttonStyle,
   cardActiveStyle,
   cardStyle,
   chipListStyle,
   dividerStyle,
   errorStyle,
+  filterGroupStyle,
+  filterInputStyle,
+  focusStyleText,
+  folderGridStyle,
+  folderSectionStyle,
   hintStyle,
-  inputStyle,
+  optionsGridStyle,
+  pageDescriptionStyle,
+  pageHeaderStyle,
   pageStyle,
+  pageTitleStyle,
+  primaryButtonStyle,
+  sectionHeaderStyle,
   sectionTitleStyle,
+  statusStyle,
+  toolbarActionsStyle,
   toolbarStyle,
   warnStyle,
 } from './styles.ts';
@@ -142,10 +155,10 @@ function UngroupedArea(props: {
       data-ungrouped
       aria-label={props.t('ungrouped.title')}
     >
-      <h3 style={sectionTitleStyle}>
-        {props.t('ungrouped.title')}
-        <span style={{ ...hintStyle, marginLeft: 8 }}>{String(props.names.length)}</span>
-      </h3>
+      <div style={sectionHeaderStyle}>
+        <h3 style={sectionTitleStyle}>{props.t('ungrouped.title')}</h3>
+        <span style={badgeStyle}>{String(props.names.length)}</span>
+      </div>
       <div style={chipListStyle}>
         {props.names.length === 0 ? (
           <span style={hintStyle}>{props.emptyText}</span>
@@ -233,55 +246,68 @@ export function FolderPage(props: FolderPageProps) {
   return (
     <SettingsForm labels={formLabels(t)} state={form} onSave={props.save} onDiscard={props.discard}>
       <div style={pageStyle} data-skill-folder-page>
-        <div style={toolbarStyle}>
-          <button
-            type="button"
-            style={buttonStyle}
-            disabled={disabled}
-            onClick={() => {
-              props.addFolder('');
-            }}
-          >
-            {t('folder.create')}
-          </button>
-          <button
-            type="button"
-            style={buttonStyle}
-            disabled={disabled || skillsState.status !== 'ready'}
-            onClick={() => {
-              props.replaceFolders(
-                autoGroup(
-                  folders,
-                  skills.map((skill) => skill.name),
-                  (prefix) => t('autoGroup.description', { prefix }),
-                ),
-              );
-            }}
-          >
-            {t('autoGroup.label')}
-          </button>
-          <input
-            aria-label={t('filter.label')}
-            placeholder={t('filter.placeholder')}
-            style={{ ...inputStyle, flex: '1 1 160px' }}
-            value={filter}
-            onChange={(event) => {
-              setFilter(event.target.value);
-            }}
-          />
-          {form.dirty ? (
+        <style data-skill-folder-focus-styles>{focusStyleText}</style>
+        <header style={pageHeaderStyle}>
+          <h2 style={pageTitleStyle}>{t('page.title')}</h2>
+          <p style={pageDescriptionStyle}>{t('page.description')}</p>
+        </header>
+        <div style={toolbarStyle} data-skill-folder-toolbar>
+          <div style={toolbarActionsStyle}>
+            <button
+              type="button"
+              style={primaryButtonStyle}
+              disabled={disabled}
+              onClick={() => {
+                props.addFolder('');
+              }}
+            >
+              {t('folder.create')}
+            </button>
             <button
               type="button"
               style={buttonStyle}
-              disabled={form.saving}
-              onClick={props.discard}
+              disabled={disabled || skillsState.status !== 'ready'}
+              onClick={() => {
+                props.replaceFolders(
+                  autoGroup(
+                    folders,
+                    skills.map((skill) => skill.name),
+                    (prefix) => t('autoGroup.description', { prefix }),
+                  ),
+                );
+              }}
             >
-              {t('page.discard')}
+              {t('autoGroup.label')}
             </button>
-          ) : null}
+            {form.dirty ? (
+              <button
+                type="button"
+                style={buttonStyle}
+                disabled={form.saving}
+                onClick={props.discard}
+              >
+                {t('page.discard')}
+              </button>
+            ) : null}
+          </div>
+          <div style={filterGroupStyle}>
+            <input
+              aria-label={t('filter.label')}
+              placeholder={t('filter.placeholder')}
+              style={filterInputStyle}
+              value={filter}
+              onChange={(event) => {
+                setFilter(event.target.value);
+              }}
+            />
+          </div>
         </div>
 
-        {skillsState.status === 'loading' ? <p style={hintStyle}>{t('page.loading')}</p> : null}
+        {skillsState.status === 'loading' ? (
+          <p style={{ ...statusStyle, ...hintStyle }} role="status">
+            {t('page.loading')}
+          </p>
+        ) : null}
         {skillsState.status === 'error' ? (
           <p style={errorStyle} role="alert">
             {t('page.loadFailed', { message: skillsState.message })}{' '}
@@ -302,25 +328,32 @@ export function FolderPage(props: FolderPageProps) {
         ) : null}
 
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          {folders.map((folder, index) => (
-            <FolderCard
-              // 下标稳定：名称编辑时卡片不重建，输入框保持焦点
-              // biome-ignore lint/suspicious/noArrayIndexKey: 文件夹以下标定位
-              key={folderDropId(index)}
-              index={index}
-              folder={folder}
-              folderNames={folderNames}
-              descriptions={descriptions}
-              loaded={skillsState.status === 'ready'}
-              errors={errors.filter((error) => error.index === index)}
-              disabled={disabled}
-              t={t}
-              onRename={props.renameFolder}
-              onDescribe={props.describeFolder}
-              onRemove={props.removeFolder}
-              onMove={props.moveSkill}
-            />
-          ))}
+          <section style={folderSectionStyle} aria-label={t('page.folders')}>
+            <div style={sectionHeaderStyle}>
+              <h3 style={sectionTitleStyle}>{t('page.folders')}</h3>
+              <span style={badgeStyle}>{String(folders.length)}</span>
+            </div>
+            <div style={folderGridStyle} data-skill-folder-grid>
+              {folders.map((folder, index) => (
+                <FolderCard
+                  // 下标稳定：名称编辑时卡片不重建，输入框保持焦点
+                  key={folderDropId(index)}
+                  index={index}
+                  folder={folder}
+                  folderNames={folderNames}
+                  descriptions={descriptions}
+                  loaded={skillsState.status === 'ready'}
+                  errors={errors.filter((error) => error.index === index)}
+                  disabled={disabled}
+                  t={t}
+                  onRename={props.renameFolder}
+                  onDescribe={props.describeFolder}
+                  onRemove={props.removeFolder}
+                  onMove={props.moveSkill}
+                />
+              ))}
+            </div>
+          </section>
           <UngroupedArea
             names={ungrouped}
             descriptions={descriptions}
@@ -333,45 +366,47 @@ export function FolderPage(props: FolderPageProps) {
         </DndContext>
 
         <div style={{ ...dividerStyle, paddingTop: 12 }} data-skill-folder-options>
-          <h3 style={sectionTitleStyle}>{t('options.title')}</h3>
-          <SettingsValueField
-            id={`${id}-default-limit`}
-            label={t('options.defaultLimit')}
-            hint={t('options.defaultLimitHint')}
-            invalidLabel={t('options.defaultLimitHint')}
-            overriddenLabel={t('page.overridden')}
-            resetLabel={t('page.reset')}
-            text={form.defaultLimit.text}
-            overridden={form.defaultLimit.overridden}
-            invalid={form.defaultLimit.invalid}
-            disabled={disabled}
-            numeric
-            onEdit={(text) => {
-              props.edit('defaultLimit', text);
-            }}
-            onReset={() => {
-              props.resetField('defaultLimit');
-            }}
-          />
-          <SettingsValueField
-            id={`${id}-description-max`}
-            label={t('options.descriptionMaxLength')}
-            hint={t('options.descriptionMaxLengthHint')}
-            invalidLabel={t('options.descriptionMaxLengthHint')}
-            overriddenLabel={t('page.overridden')}
-            resetLabel={t('page.reset')}
-            text={form.descriptionMaxLength.text}
-            overridden={form.descriptionMaxLength.overridden}
-            invalid={form.descriptionMaxLength.invalid}
-            disabled={disabled}
-            numeric
-            onEdit={(text) => {
-              props.edit('descriptionMaxLength', text);
-            }}
-            onReset={() => {
-              props.resetField('descriptionMaxLength');
-            }}
-          />
+          <h3 style={{ ...sectionTitleStyle, marginBottom: 10 }}>{t('options.title')}</h3>
+          <div style={optionsGridStyle}>
+            <SettingsValueField
+              id={`${id}-default-limit`}
+              label={t('options.defaultLimit')}
+              hint={t('options.defaultLimitHint')}
+              invalidLabel={t('options.defaultLimitHint')}
+              overriddenLabel={t('page.overridden')}
+              resetLabel={t('page.reset')}
+              text={form.defaultLimit.text}
+              overridden={form.defaultLimit.overridden}
+              invalid={form.defaultLimit.invalid}
+              disabled={disabled}
+              numeric
+              onEdit={(text) => {
+                props.edit('defaultLimit', text);
+              }}
+              onReset={() => {
+                props.resetField('defaultLimit');
+              }}
+            />
+            <SettingsValueField
+              id={`${id}-description-max`}
+              label={t('options.descriptionMaxLength')}
+              hint={t('options.descriptionMaxLengthHint')}
+              invalidLabel={t('options.descriptionMaxLengthHint')}
+              overriddenLabel={t('page.overridden')}
+              resetLabel={t('page.reset')}
+              text={form.descriptionMaxLength.text}
+              overridden={form.descriptionMaxLength.overridden}
+              invalid={form.descriptionMaxLength.invalid}
+              disabled={disabled}
+              numeric
+              onEdit={(text) => {
+                props.edit('descriptionMaxLength', text);
+              }}
+              onReset={() => {
+                props.resetField('descriptionMaxLength');
+              }}
+            />
+          </div>
         </div>
       </div>
     </SettingsForm>

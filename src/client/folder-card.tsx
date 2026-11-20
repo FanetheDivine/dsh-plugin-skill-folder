@@ -13,11 +13,14 @@ import type { FolderError } from '../folders.ts';
 import type { NS } from './locales.ts';
 import { SkillChip } from './skill-chip.tsx';
 import {
+  badgeStyle,
+  cardActionsStyle,
   cardActiveStyle,
   cardHeaderStyle,
   cardStyle,
   chipListStyle,
   errorStyle,
+  folderNameInputStyle,
   hintStyle,
   inputStyle,
   invalidInputStyle,
@@ -95,29 +98,32 @@ export function FolderCard(props: FolderCardProps) {
           aria-label={t('folder.name')}
           aria-invalid={nameMessage === undefined ? undefined : true}
           placeholder={t('folder.namePlaceholder')}
-          style={{
-            ...(nameMessage === undefined ? inputStyle : invalidInputStyle),
-            flex: '0 1 200px',
-          }}
+          style={
+            nameMessage === undefined
+              ? folderNameInputStyle
+              : { ...folderNameInputStyle, ...invalidInputStyle }
+          }
           value={folder.name}
           disabled={props.disabled}
           onChange={(event) => {
             props.onRename(index, event.target.value);
           }}
         />
-        <span style={{ ...hintStyle, flex: 1 }}>
-          {t('folder.members', { count: String(folder.skills.length) })}
-        </span>
-        <button
-          type="button"
-          style={textButtonStyle}
-          disabled={props.disabled}
-          onClick={() => {
-            props.onRemove(index);
-          }}
-        >
-          {t('folder.delete')}
-        </button>
+        <div style={cardActionsStyle}>
+          <span style={badgeStyle}>
+            {t('folder.members', { count: String(folder.skills.length) })}
+          </span>
+          <button
+            type="button"
+            style={textButtonStyle}
+            disabled={props.disabled}
+            onClick={() => {
+              props.onRemove(index);
+            }}
+          >
+            {t('folder.delete')}
+          </button>
+        </div>
       </div>
       {nameMessage === undefined ? null : (
         <p style={errorStyle} role="alert">

@@ -58,10 +58,10 @@ export function SkillChip(props: SkillChipProps) {
       {...listeners}
       {...attributes}
     >
-      <span style={chipNameStyle}>{props.name}</span>
+      <span style={{ ...chipNameStyle, minWidth: 0 }}>{props.name}</span>
       <select
         aria-label={`${props.t('skill.move')} ${props.name}`}
-        style={selectStyle}
+        style={{ ...selectStyle, flexShrink: 0 }}
         value={props.folder ?? UNGROUPED_VALUE}
         disabled={props.disabled}
         // 下拉框交互时不触发拖拽

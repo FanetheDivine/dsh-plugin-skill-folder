@@ -35,13 +35,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T004 [US1] 在 `tests/client.test.ts` 添加页面层级、响应式容器和现有操作保持可用的失败测试
+- [x] T004 [US1] 在 `tests/client.test.ts` 添加页面层级、响应式容器和现有操作保持可用的失败测试
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] 在 `src/client/folder-page.tsx` 实现标题说明、主要操作区、文件夹网格、状态区与搜索选项的清晰层级
-- [ ] T006 [P] [US1] 在 `src/client/folder-card.tsx` 优化名称、简介、计数、删除和成员区域的卡片布局
-- [ ] T007 [P] [US1] 在 `src/client/skill-chip.tsx` 优化技能条目与移动控件的密度、长名称和交互样式
+- [x] T005 [US1] 在 `src/client/folder-page.tsx` 实现标题说明、主要操作区、文件夹网格、状态区与搜索选项的清晰层级
+- [x] T006 [P] [US1] 在 `src/client/folder-card.tsx` 优化名称、简介、计数、删除和成员区域的卡片布局
+- [x] T007 [P] [US1] 在 `src/client/skill-chip.tsx` 优化技能条目与移动控件的密度、长名称和交互样式
 
 **Checkpoint**: 页面主要流程保持可用，视觉层级可独立验收
 

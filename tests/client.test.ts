@@ -186,6 +186,17 @@ describe('配置页渲染', () => {
     expect(html).toContain('保存');
   });
 
+  it('页面提供标题、用途说明、操作区与自适应文件夹网格', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('<h2');
+    expect(html).toContain('技能文件夹');
+    expect(html).toContain('按用途整理全局技能');
+    expect(html).toContain('data-skill-folder-toolbar');
+    expect(html).toContain('data-skill-folder-grid');
+    expect(html).toContain('grid-template-columns:repeat(auto-fit');
+    expect(html).toContain('data-skill-folder-focus-styles');
+  });
+
   it('page 渲染英文文案', () => {
     const html = renderPage('page', en);
     expect(html).toContain('New folder');
