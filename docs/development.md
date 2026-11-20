@@ -72,21 +72,27 @@
 | Job | 触发 | 内容 |
 | --- | --- | --- |
 | `check` | PR、打 tag | Node 24 上运行 `pnpm run full-check` |
-| `publish` | 默认禁用 | 打 tag 时发布 npm，用 OIDC 换取发布令牌 |
+| `publish` | 打 tag | 发布 npm，用 OIDC 换取发布令牌 |
 
 - `full-check` 依次运行 `check` 与 `build`：`check` 不读取 `dist`，产物测试在 `build` 末尾执行。
 - `publish` 用 Node 24 自带的 npm 发布：Trusted Publishing（OIDC）要求 npm ≥ 11.5.1，Node 24 的安装包已满足，工作流不单独安装 npm。
-- `publish` 由 `if: false` 禁用，原触发条件以注释保留；`pnpm run release` 推送的 tag 不会在 npm 产生新版本。
-- 模板转化时解禁，步骤见 [template-conversion.md](./template-conversion.md)。
+- `pnpm run release` 推 tag 后在 npm 产生新版本。
+- 首次发布前把 npm Trusted Publisher 绑定到本仓库与 `.github/workflows/ci.yml`。
 
 ## 测试
 
 | 文件 | 覆盖内容 |
 | --- | --- |
-| `tests/plugin.test.ts` | 配置校验、热重载、demo 工具、`apply` 接线 |
-| `tests/config-form.test.ts` | 配置页草稿、空白前缀拒绝、保存、恢复默认与放弃 |
+| `tests/plugin.test.ts` | `apply` 接线、目录折叠、检索工具注册、路由与热更新 |
+| `tests/config.test.ts` | 配置默认值、文件夹规则、数值范围、未知键与实时读取 |
+| `tests/folders.test.ts` | 文件夹名称规则、成员唯一、查找与未分组集合 |
+| `tests/skills.test.ts` | 模型可调用过滤、全局来源与路径判定、全局列表读取 |
+| `tests/search.test.ts` | 分词、排序、准确名称优先、分页、截断与按文件夹列出 |
+| `tests/catalog.test.ts` | 目录折叠文本、项目级覆盖、空文件夹与保持原样 |
+| `tests/auto-group.test.ts` | 文件夹名匹配、前缀合并、成员下限与组名规则 |
+| `tests/folder-form.test.ts` | 配置页草稿的格式化与解析、编辑、校验、保存与放弃 |
 | `tests/release-archive.test.mjs` | CHANGELOG 归档计划 |
-| `tests/client.test.ts` | 前端服务声明、字典与槽位注册、示例行与配置页渲染 |
+| `tests/client.test.ts` | 前端服务分组、字典键集、配置页注册与渲染 |
 | `tests/client-bundle.test.ts` | `dist/client.js` 的注册契约与导出（产物测试） |
 | `tests/package-pack.test.ts` | npm 包只含发布所需文件，含前端产物与元数据资源（产物测试） |
 | `tests/pack-report.test.ts` | `npm pack --json` 的数组与对象两种报告形状都能解析 |
@@ -171,18 +177,26 @@ spec 与 plan 模板包含状态、待确认决策、澄清记录和审查记录
 ```text
 cordis.patch.yml            # 插件行，dsh plugin add 时插入 profile
 src/
-├── index.ts                # 打包入口，导出 name、inject、apply、Config
-├── config.ts               # Config schema、默认值、严格校验与热重载读取
-├── constants.ts            # 共享常量
-├── demo-tool.ts            # demo_echo 工具
-├── events.ts               # agent 事件监听示例
+├── index.ts                # 宿主入口：导出 name、inject、apply、Config
+├── config.ts               # Config schema、默认值、严格校验与实时读取
+├── constants.ts            # 共享常量：插件标识、工具名、上下限与路由
+├── folders.ts              # 文件夹查找、成员集合、未分组集合与校验
+├── skills.ts               # 模型可调用过滤、全局判定与全局列表读取
+├── search.ts               # 分词、评分、排序、分页与摘要截断
+├── search-tool.ts          # skill_search 工具定义与参数校验
+├── catalog.ts              # 原生技能目录的折叠改写
+├── routes.ts               # GET /api/skill-folder/skills
 ├── types.ts                # 宿主类型再导出
 ├── utils.ts                # 零依赖工具函数
 └── client/
-    ├── index.ts            # 浏览器入口：注册字典、示例行与配置页
-    ├── config-form.ts      # 配置页草稿模型与行键常量
-    ├── config-page.tsx     # 配置页的 summary 与 page 视图
-    ├── demo-dock.tsx       # 前端示例行组件
+    ├── index.ts            # 浏览器入口：注册字典与插件行配置页
+    ├── api.ts              # 全局技能列表的读取与解析
+    ├── auto-group.ts       # 按前缀自动分组
+    ├── folder-form.ts      # 配置页草稿模型与行键常量
+    ├── folder-page.tsx     # 配置页视图与拖拽上下文
+    ├── folder-card.tsx     # 文件夹卡片与放置区
+    ├── skill-chip.tsx      # 可拖拽技能条目与「移动到」下拉框
+    ├── styles.ts           # 只引用主题令牌的内联样式
     └── locales.ts          # 中英文字典与命名空间
 dist/
 ├── index.mjs               # 宿主产物
@@ -204,5 +218,5 @@ specs/<NNN>-<name>/         # 每个需求的 spec、plan、tasks
 ├── scripts/bash/           # Spec Kit 脚本
 ├── extensions.yml          # 扩展钩子
 └── extensions/worktree/    # 本地 worktree 扩展
-.github/workflows/ci.yml    # CI：check（Node 24）与默认禁用的 publish
+.github/workflows/ci.yml    # CI：check（Node 24）与打 tag 时 publish
 ```
