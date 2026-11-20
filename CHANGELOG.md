@@ -18,6 +18,7 @@
 
 ### Changed
 
+- 宿主依赖升级：9 个 `@deepseek-ai/dsh-*` 开发依赖从 `0.2.2-rc.3` 固定到 `0.2.2-rc.5`，`pnpm-workspace.yaml` 豁免清单与锁文件同步
 - 仓库从 DSH 插件模板转化为 `dsh-plugin-skill-folder@0.1.0`，移除模板示例工具、事件日志与示例行
 - 宪章标题改为 `dsh-plugin-skill-folder Constitution`，版本升到 2.0.1
 - CI 恢复 `publish` job 的 tag 触发条件
