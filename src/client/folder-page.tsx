@@ -343,7 +343,11 @@ export function FolderPage(props: FolderPageProps) {
           </div>
           <div style={filterGroupStyle}>
             <input
+              type="search"
               aria-label={t('filter.label')}
+              aria-describedby={`${id}-filter-count`}
+              autoComplete="off"
+              spellCheck={false}
               placeholder={t('filter.placeholder')}
               style={filterInputStyle}
               value={filter}
@@ -351,7 +355,7 @@ export function FolderPage(props: FolderPageProps) {
                 setFilter(event.target.value);
               }}
             />
-            <span style={badgeStyle} role="status" aria-live="polite">
+            <span id={`${id}-filter-count`} style={badgeStyle} role="status" aria-live="polite">
               {filterActive
                 ? t('filter.results', {
                     visible: String(visibleCount),

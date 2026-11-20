@@ -74,11 +74,11 @@
 
 ### Tests for User Story 3
 
-- [ ] T011 [US3] 在 `tests/client.test.ts` 添加状态区域、控件可访问名称、焦点样式和中英文案回归测试
+- [x] T011 [US3] 在 `tests/client.test.ts` 添加状态区域、控件可访问名称、焦点样式和中英文案回归测试
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] 在 `src/client/folder-page.tsx`、`src/client/folder-card.tsx` 与 `src/client/skill-chip.tsx` 完善状态展示、标签、键盘操作和禁用状态
+- [x] T012 [US3] 在 `src/client/folder-page.tsx`、`src/client/folder-card.tsx` 与 `src/client/skill-chip.tsx` 完善状态展示、标签、键盘操作和禁用状态
 
 **Checkpoint**: 三个故事均具备独立可测试的行为和反馈
 

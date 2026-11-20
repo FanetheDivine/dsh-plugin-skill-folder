@@ -236,6 +236,22 @@ describe('配置页渲染', () => {
     expect(html).toContain('文件夹配置有误，修正后才能保存。');
   });
 
+  it('筛选输入关联实时结果计数，并提供状态与焦点语义', () => {
+    const html = renderPage('page', zh);
+    expect(html).toMatch(/<input[^>]*aria-label="筛选技能"[^>]*aria-describedby="[^"]+"/);
+    expect(html).toMatch(/<span[^>]*id="[^"]+"[^>]*role="status"[^>]*aria-live="polite"/);
+    expect(html).toContain('role="status"');
+    expect(html).toContain('data-skill-folder-focus-styles');
+    expect(html).toContain(':focus-visible');
+  });
+
+  it('英文界面包含新增的页面、筛选与折叠文案', () => {
+    const html = renderPage('page', en);
+    expect(html).toContain('Organize global skills by purpose');
+    expect(html).toContain('1 skills');
+    expect(html).toContain('aria-label="Collapse lark"');
+  });
+
   it('只读时禁用编辑控件与保存', () => {
     const html = renderPage('page', zh, pageState({ writable: false }));
     expect(html).toContain('此部署以只读方式保存设置。');
