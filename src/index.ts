@@ -41,6 +41,15 @@ interface WorkingDirectoryService {
   ensure: (agent: object, signal?: AbortSignal) => Promise<string>;
 }
 
+/** 宿主 `agentPresets` 服务的最小面。 */
+interface AgentPresetsService {
+  /** 取得默认 preset 的作用域租约；不传 id 时用注册表的默认 preset。 */
+  acquireScope: (id?: string) => Promise<{ readonly key: object }>;
+}
+
+/** 一次技能快照读取。 */
+type SkillSnapshot = Awaited<ReturnType<SkillsService['snapshot']>>;
+
 /** 本插件用到的宿主服务。 */
 interface PluginServices {
   /** 技能注册表。 */
@@ -49,8 +58,21 @@ interface PluginServices {
   tools?: ToolsService | undefined;
   /** 会话工作目录。 */
   workingDirectory?: WorkingDirectoryService | undefined;
+  /** 按名称读取服务；宿主未装载该服务时返回 undefined。 */
+  get?: ((service: string) => unknown) | undefined;
   /** 日志。 */
   logger: { info?: (message: string) => void; warn?: (message: string) => void };
+}
+
+/**
+ * 释放 preset 作用域租约。
+ * `Symbol.asyncDispose` 不在 `es2024` lib 里，运行时按名字取。
+ */
+async function releasePresetScope(lease: object): Promise<void> {
+  const key = (Symbol as unknown as Record<string, symbol | undefined>)['asyncDispose'];
+  if (key === undefined) return;
+  const dispose = (lease as unknown as Record<symbol, unknown>)[key];
+  if (typeof dispose === 'function') await (dispose as () => Promise<void>).call(lease);
 }
 
 /** 判断消息来源是否是原生技能目录。 */
@@ -102,14 +124,34 @@ export function apply(ctx: Context, config?: unknown): void {
     `${PLUGIN_LABEL}: search tool`,
   );
 
-  // 配置页读取全局技能：不传工作区与作用域，只得到全局集合
-  registerSkillsRoute(ctx as unknown as RouteHost, {
-    snapshot: async () => {
-      const snapshot = await services.skills?.snapshot({});
-      if (snapshot === undefined) throw new Error(`${PLUGIN_LABEL}: skills service unavailable`);
-      return snapshot;
-    },
-  });
+  /**
+   * 读取配置页的全局技能。
+   * 默认 preset 的 `skill-filesystem` 注册在 agent 作用域，根作用域快照看不到它，
+   * 因此先取默认 preset 的作用域再读；取作用域失败时退回根作用域，并把列表标记为不完整。
+   */
+  const readGlobalSnapshot = async (): Promise<SkillSnapshot> => {
+    const skills = services.skills;
+    if (skills === undefined) throw new Error(`${PLUGIN_LABEL}: skills service unavailable`);
+    const presets = services.get?.('agentPresets') as AgentPresetsService | undefined;
+    // 宿主没有 preset 注册表时，根作用域快照就是全部
+    if (presets === undefined) return skills.snapshot({});
+    let lease: { readonly key: object };
+    try {
+      lease = await presets.acquireScope();
+    } catch (error) {
+      services.logger.warn?.(`[${PLUGIN_LABEL}] preset scope unavailable: ${String(error)}`);
+      const snapshot = await skills.snapshot({});
+      return { skills: snapshot.skills, complete: false };
+    }
+    try {
+      return await skills.snapshot({ scope: lease.key });
+    } finally {
+      await releasePresetScope(lease);
+    }
+  };
+
+  // 配置页读取全局技能：按默认 preset 的作用域读取
+  registerSkillsRoute(ctx as unknown as RouteHost, { snapshot: readGlobalSnapshot });
 
   ctx.effect(
     () =>
