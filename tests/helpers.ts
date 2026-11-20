@@ -200,7 +200,7 @@ export function makeClientCtx(options: { services?: ClientServiceName[] } = {}) 
       state._configFormRequests.push(entryId);
       const fake = makeConfigFormScope<Record<string, unknown>>({
         status: 'ready',
-        value: { demoEnabled: true, prefix: 'demo' },
+        value: { folders: [], defaultLimit: 5, descriptionMaxLength: 320 },
       });
       state._configFormScopes.push(fake);
       return fake.scope;

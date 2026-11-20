@@ -1,275 +1,263 @@
-// dsh-plugin-template 单元测试（vitest）：模块契约 / 配置校验（严格模式）/
-// demo 工具（zod 参数校验）/ apply 接线（工具注册 + 事件监听 + 日志）。
-// 测试目标是 src 的纯函数与 apply 接线，不依赖真实宿主。
+// 插件接线测试：导出契约、pre-step 折叠接线、工具可见性、热更新与卸载。
 import { describe, expect, it } from 'vitest';
-
-import { Config, readConfig, resolveConfig } from '../src/config.ts';
-import { DEMO_TOOL_NAME, PLUGIN_LABEL } from '../src/constants.ts';
-import { buildDemoTool, parseEchoArgs } from '../src/demo-tool.ts';
+import { PLUGIN_LABEL } from '../src/constants.ts';
 import { apply, inject, name } from '../src/index.ts';
-import { makeCtx, volatile } from './helpers.ts';
+import { volatile } from './helpers.ts';
+import { makePluginCtx } from './support/plugin-ctx.ts';
 
 describe('模块契约', () => {
-  it('插件入口导出 name / inject / apply', () => {
-    expect(name).toBe('dsh-plugin-template'); // 与 cordis.patch.yml 的 id 一致
-    expect(inject).toEqual(['tools', 'llm', 'tokenMeter', 'sessions']);
+  it('导出 name / inject / apply', () => {
+    expect(name).toBe(PLUGIN_LABEL);
+    expect(inject).toEqual(['tools', 'skills', 'workingDirectory']);
     expect(typeof apply).toBe('function');
-    expect(typeof Config).toBe('function'); // 宿主据此识别 schema
-  });
-});
-
-describe('读取实时配置 readConfig', () => {
-  it('展开热重载引用并校验', () => {
-    const config = { demoEnabled: volatile(false), prefix: volatile('p') };
-    expect(readConfig(config)).toEqual({ demoEnabled: false, prefix: 'p' });
-  });
-
-  it('引用变化后读到新值', () => {
-    const prefix = volatile('a');
-    const config = { demoEnabled: volatile(true), prefix };
-    expect(readConfig(config).prefix).toBe('a');
-    prefix.set('b');
-    expect(readConfig(config).prefix).toBe('b');
-  });
-
-  it('严格校验：未知键、非法值、非对象输入抛错', () => {
-    const base = { demoEnabled: volatile(true), prefix: volatile('p') };
-    expect(() => readConfig({ ...base, bogus: 1 })).toThrow('unknown config key "bogus"');
-    expect(() => readConfig({ ...base, prefix: volatile('  ') })).toThrow(
-      'prefix must be a non-empty',
-    );
-    expect(() => readConfig({ ...base, demoEnabled: volatile('x') })).toThrow('must be a boolean');
-    expect(() => readConfig([])).toThrow('config must be an object');
-  });
-
-  it('宿主未传入配置时使用默认值', () => {
-    expect(readConfig(undefined)).toEqual({ demoEnabled: true, prefix: 'demo' });
-  });
-});
-
-describe('Config schema', () => {
-  it('缺省值与实时读取', () => {
-    const parsed = Config({});
-    expect(parsed.prefix.get()).toBe('demo');
-    expect(parsed.demoEnabled.get()).toBe(true);
-  });
-
-  it('空白前缀与非法类型被 schema 拒绝', () => {
-    expect(() => Config({ prefix: '  ' })).toThrow();
-    expect(() => Config({ demoEnabled: 'yes' })).toThrow();
-  });
-
-  it('未知键由 readConfig 拒绝', () => {
-    expect(() => readConfig(Config({ bogus: 1 }))).toThrow('unknown config key "bogus"');
-  });
-});
-
-describe('配置校验 resolveConfig', () => {
-  it('默认值正确', () => {
-    const d = resolveConfig({});
-    expect(d.demoEnabled).toBe(true);
-    expect(d.prefix).toBe('demo');
-  });
-
-  it('整份配置留空（undefined/null）时全部用默认值', () => {
-    for (const raw of [undefined, null]) {
-      const d = resolveConfig(raw);
-      expect(d.demoEnabled).toBe(true);
-      expect(d.prefix).toBe('demo');
-    }
-  });
-
-  it('覆盖项生效', () => {
-    const c = resolveConfig({ demoEnabled: false, prefix: 'my-plugin' });
-    expect(c.demoEnabled).toBe(false);
-    expect(c.prefix).toBe('my-plugin');
-  });
-
-  it('单项缺省（null/undefined）该键用默认值，其余覆盖项仍生效；空串视为非法值报错', () => {
-    expect(resolveConfig({ prefix: null }).prefix).toBe('demo');
-    const mixed = resolveConfig({ demoEnabled: false, prefix: undefined });
-    expect(mixed.demoEnabled).toBe(false);
-    expect(mixed.prefix).toBe('demo');
-    expect(() => resolveConfig({ prefix: '' })).toThrow('prefix must be a non-empty string');
-  });
-
-  it('严格校验：未知键 / 非法类型 / 非对象输入直接拒绝（插件加载即报错）', () => {
-    expect(() => resolveConfig({ badKey: 1 })).toThrow('unknown config key "badKey"');
-    expect(() => resolveConfig({ demoEnabled: 'yes' })).toThrow('demoEnabled must be a boolean');
-    expect(() => resolveConfig({ prefix: 42 })).toThrow('prefix must be a non-empty string');
-    expect(() => resolveConfig([])).toThrow('config must be an object');
-    // 错误消息统一带插件标识，便于在宿主日志中定位来源
-    expect(() => resolveConfig({ badKey: 1 })).toThrow(PLUGIN_LABEL);
-  });
-
-  it('返回冻结的完整配置（缺省键已补齐）', () => {
-    const d = resolveConfig({ prefix: 'p' });
-    expect(Object.isFrozen(d)).toBe(true);
-    expect(d).toEqual({ demoEnabled: true, prefix: 'p' });
-  });
-});
-
-describe('demo 工具 parseEchoArgs / buildDemoTool', () => {
-  it('合法参数解析成功', () => {
-    expect(parseEchoArgs({ text: 'hello' })).toEqual({ ok: true, text: 'hello' });
-  });
-
-  it('非法参数返回错误提示而非抛出（safeParse）', () => {
-    expect(parseEchoArgs({}).ok).toBe(false);
-    expect(parseEchoArgs({ text: '' }).ok).toBe(false);
-    expect(parseEchoArgs({ text: 42 }).ok).toBe(false);
-    expect(parseEchoArgs(null).ok).toBe(false);
-    const r = parseEchoArgs({});
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain('参数不合法');
-  });
-
-  it('工具定义字段完整（name/description/parameters/output/execute）', () => {
-    const tool = buildDemoTool('demo');
-    expect(tool.name).toBe(DEMO_TOOL_NAME);
-    expect(tool.description).toContain('demo');
-    expect(tool.parameters).toEqual({
-      text: { type: 'string', description: '要回显的文本', required: true },
-    });
-    expect(typeof tool.execute).toBe('function');
-    expect(tool.output.render({ text: 'x' }, 'out')).toEqual([{ type: 'text', text: 'out' }]);
-  });
-
-  it('execute：合法参数回显带前缀与 session id，非法参数返回提示', async () => {
-    const tool = buildDemoTool('demo');
-    const exec = { agent: { id: 'a1' } };
-    await expect(tool.execute({ text: 'hi' }, exec)).resolves.toBe('[demo] (session a1) hi');
-    await expect(tool.execute({}, exec)).resolves.toContain('参数不合法');
   });
 });
 
 describe('apply 接线', () => {
-  it('默认配置：注册 demo 工具 + 监听全部事件 + 打印 apply 日志', () => {
-    const ctx = makeCtx();
-    apply(ctx, {});
-    expect(ctx._registeredTools.map((t) => t.name)).toEqual([DEMO_TOOL_NAME]);
-    for (const ev of [
-      'agent/created',
-      'agent/disposed',
-      'agent/status',
-      'agent/pre-step',
-      'agent/turn-stopping',
-    ]) {
-      expect(ctx._onCallbacks.has(ev)).toBe(true);
-    }
-    const infos = ctx._loggerCalls.filter((c) => c.level === 'info').map((c) => String(c.args[0]));
-    expect(infos.some((s) => s.includes('apply: demoEnabled=true'))).toBe(true);
+  it('订阅 agent/pre-step 与 loader/volatile-update', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    const events = ctx._listeners.map((entry) => entry.event);
+    expect(events).toContain('agent/pre-step');
+    expect(events).toContain('loader/volatile-update');
   });
 
-  it('agent/created 监听：日志带 agent id 与创建来源', () => {
-    const ctx = makeCtx();
-    apply(ctx, {});
-    const listener = ctx._onCallbacks.get('agent/created')?.[0];
-    expect(listener).toBeTypeOf('function');
-    listener?.({ agent: { id: 'a1' }, source: 'fresh' });
-    listener?.({ agent: { id: 'a2' }, source: 'resume' });
-    const infos = ctx._loggerCalls.filter((c) => c.level === 'info').map((c) => String(c.args[0]));
-    expect(infos).toContain('[demo] agent created: a1 (fresh)');
-    expect(infos).toContain('[demo] agent created: a2 (resume)');
+  it('pre-step 监听以 prepend 注册，位于原生监听之外', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    expect(ctx._onOptions('agent/pre-step')).toEqual({ prepend: true });
   });
 
-  it('demoEnabled=false：不注册工具，但事件监听照常', () => {
-    const ctx = makeCtx();
-    apply(ctx, { demoEnabled: false });
-    expect(ctx._registeredTools).toHaveLength(0);
-    expect(ctx._onCallbacks.has('agent/created')).toBe(true);
-    const infos = ctx._loggerCalls.filter((c) => c.level === 'info').map((c) => String(c.args[0]));
-    expect(infos.some((s) => s.includes('apply: demoEnabled=false'))).toBe(true);
+  it('拒绝决策原样返回', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    const rejected = { kind: 'reject' as const };
+    const result = await ctx._runPreStep({ agent: { id: 'a' } }, async () => rejected as never);
+    expect(result).toBe(rejected);
   });
 
-  it('pre-step 监听：signal 已中止时直接放行，正常时 await 后放行', async () => {
-    const ctx = makeCtx();
-    apply(ctx, {});
-    const listener = ctx._onCallbacks.get('agent/pre-step')?.[0];
-    expect(listener).toBeTypeOf('function');
-    let nextCalled = false;
-    const next = () => {
-      nextCalled = true;
+  it('看不到 skill_search 时原样返回', async () => {
+    const ctx = makePluginCtx({ tools: ['skill'] });
+    apply(ctx as never, {});
+    const decision = { kind: 'enter' as const, messages: [ctx.catalog] };
+    const result = await ctx._runPreStep({ agent: { id: 'a' } }, async () => decision);
+    expect(result).toBe(decision);
+  });
+
+  it('没有目录消息时不读取技能快照', async () => {
+    const ctx = makePluginCtx();
+    let snapshots = 0;
+    ctx.snapshot = async () => {
+      snapshots += 1;
+      return { skills: [], complete: true };
     };
-    await listener?.({ agent: { id: 'a1' }, signal: new AbortController().signal }, next);
-    expect(nextCalled).toBe(true);
-    const aborted = new AbortController();
-    aborted.abort();
-    nextCalled = false;
-    await listener?.({ agent: { id: 'a1' }, signal: aborted.signal }, next);
-    expect(nextCalled).toBe(true);
+    apply(ctx as never, {});
+    await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [{ id: 'u', role: 'user', content: [], source: { kind: 'user' } }],
+    }));
+    expect(snapshots).toBe(0);
+  });
+
+  it('目录消息按文件夹折叠，工作目录与作用域来自本 Agent', async () => {
+    const ctx = makePluginCtx();
+    const seen: Record<string, unknown> = {};
+    ctx.snapshot = async (options) => {
+      Object.assign(seen, options);
+      return { skills: ctx.skillsFixture, complete: true };
+    };
+    apply(ctx as never, {
+      folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }],
+    });
+    const result = (await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(seen['cwd']).toBe('C:/workspace');
+    expect(seen['scope']).toEqual({ id: 'a' });
+    const text = result.messages[0]?.content[0]?.text ?? '';
+    expect(text).toContain('`lark` (1 skills): 飞书');
+    expect(text).not.toContain('`lark-doc`');
+  });
+
+  it('技能快照读取失败时保持目录不变并记录警告', async () => {
+    const ctx = makePluginCtx();
+    ctx.snapshot = undefined;
+    apply(ctx as never, { folders: [{ name: 'lark', description: '', skills: ['lark-doc'] }] });
+    const decision = { kind: 'enter' as const, messages: [ctx.catalog] };
+    const result = await ctx._runPreStep({ agent: { id: 'a' } }, async () => decision);
+    expect(result).toBe(decision);
+    expect(ctx._loggerCalls.some((call) => call.level === 'warn')).toBe(true);
   });
 });
 
-describe('配置热重载', () => {
-  /** 构造热重载引用配置并 apply。 */
-  function setup(initial: { demoEnabled?: boolean; prefix?: string } = {}) {
-    const ctx = makeCtx();
-    const config = {
-      demoEnabled: volatile(initial.demoEnabled ?? true),
-      prefix: volatile(initial.prefix ?? 'demo'),
-    };
-    apply(ctx, config);
-    return { ctx, config };
-  }
-
-  it('apply 订阅 loader/volatile-update', () => {
-    const { ctx } = setup();
-    expect(ctx._onCallbacks.has('loader/volatile-update')).toBe(true);
+describe('检索工具注册', () => {
+  it('注册 skill_search，参数说明中的默认数量来自配置', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { defaultLimit: 9 });
+    const tool = ctx._registeredTools.find((entry) => entry.name === 'skill_search');
+    expect(tool).toBeDefined();
+    expect(tool?.parameters?.properties?.limit?.description).toContain('default 9');
   });
 
-  it('prefix 变化后重新注册工具，说明与回显使用新前缀', async () => {
-    const { ctx, config } = setup();
-    config.prefix.set('hot');
-    ctx._emit('loader/volatile-update', [['prefix']]);
-    const active = [...ctx._activeTools];
+  it('卸载时注销工具', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    expect(ctx._hasTool('skill_search')).toBe(true);
+    ctx._dispose();
+    expect(ctx._hasTool('skill_search')).toBe(false);
+  });
+
+  it('配置更新后按新默认数量重新注册', () => {
+    const ctx = makePluginCtx();
+    const defaultLimit = volatile(5);
+    apply(ctx as never, { defaultLimit });
+    defaultLimit.set(11);
+    ctx._emit('loader/volatile-update', [['defaultLimit']]);
+    const active = [...ctx._activeTools].filter((entry) => entry.name === 'skill_search');
     expect(active).toHaveLength(1);
-    expect(active[0]?.description).toContain('hot');
-    const tool = buildDemoTool('hot');
-    await expect(tool.execute({ text: 'x' }, { agent: { id: 's' } })).resolves.toBe(
-      '[hot] (session s) x',
+    expect(active[0]?.parameters?.properties?.limit?.description).toContain('default 11');
+  });
+
+  it('工具按当前文件夹检索，并透传检索完整性', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {
+      folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }],
+    });
+    const tool = ctx._registeredTools.find((entry) => entry.name === 'skill_search');
+    const result = await tool?.execute(
+      { folder: 'lark' },
+      { agent: { id: 'a' }, signal: new AbortController().signal },
+    );
+    expect(result).toMatchObject({ folder: 'lark', total: 1, complete: true });
+    expect(result?.results).toHaveLength(1);
+    expect(result?.results?.[0]).toMatchObject({
+      name: 'lark-doc',
+      folder: 'lark',
+      match: 'folder',
+    });
+  });
+
+  it('原生加载器不可用时工具报错', async () => {
+    const ctx = makePluginCtx({ tools: ['skill_search'] });
+    apply(ctx as never, { folders: [] });
+    const tool = ctx._registeredTools.find((entry) => entry.name === 'skill_search');
+    await expect(tool?.execute({ query: 'lark' }, { agent: { id: 'a' } })).rejects.toThrow(
+      'skill loader',
     );
   });
+});
 
-  it('demoEnabled 变为 false 后注销工具，变回 true 后重新注册', () => {
-    const { ctx, config } = setup();
-    expect(ctx._activeTools.size).toBe(1);
-    config.demoEnabled.set(false);
-    ctx._emit('loader/volatile-update', [['demoEnabled']]);
-    expect(ctx._activeTools.size).toBe(0);
-    config.demoEnabled.set(true);
-    ctx._emit('loader/volatile-update', [['demoEnabled']]);
-    expect(ctx._activeTools.size).toBe(1);
+describe('配置热更新', () => {
+  it('保存后使用新文件夹', async () => {
+    const ctx = makePluginCtx();
+    const folders = volatile<{ name: string; description: string; skills: string[] }[]>([]);
+    apply(ctx as never, { folders });
+    const before = (await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: readonly unknown[] };
+    expect(before.messages[0]).toBe(ctx.catalog);
+
+    folders.set([{ name: 'lark', description: '', skills: ['lark-doc'] }]);
+    ctx._emit('loader/volatile-update', [['folders']]);
+    const after = (await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(after.messages[0]?.content[0]?.text).toContain('`lark`');
   });
 
-  it('demoEnabled 初始为 false 时不注册，开启后注册', () => {
-    const { ctx, config } = setup({ demoEnabled: false });
-    expect(ctx._activeTools.size).toBe(0);
-    config.demoEnabled.set(true);
-    ctx._emit('loader/volatile-update', []);
-    expect(ctx._activeTools.size).toBe(1);
+  it('非法更新被忽略并记录警告', async () => {
+    const ctx = makePluginCtx();
+    const folders = volatile<unknown[]>([{ name: 'ok', description: '', skills: [] }]);
+    apply(ctx as never, { folders });
+    folders.set([{ name: '', description: '', skills: [] }]);
+    ctx._emit('loader/volatile-update', [['folders']]);
+    expect(ctx._loggerCalls.some((call) => call.level === 'warn')).toBe(true);
+    const result = (await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: readonly unknown[] };
+    // 保持原状：旧配置没有折叠任何成员
+    expect(result.messages[0]).toBe(ctx.catalog);
+  });
+});
+
+describe('全局技能路由', () => {
+  it('注册 GET /api/skill-folder/skills', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    expect(ctx._routes.map((route) => [route.path, route.methods])).toEqual([
+      ['/api/skill-folder/skills', ['GET']],
+    ]);
   });
 
-  it('事件日志使用新前缀', () => {
-    const { ctx, config } = setup();
-    config.prefix.set('hot');
-    ctx._emit('loader/volatile-update', [['prefix']]);
-    ctx._emit('agent/created', { agent: { id: 'a1' }, source: 'fresh' });
-    const infos = ctx._loggerCalls.map((c) => String(c.args[0]));
-    expect(infos).toContain('[hot] agent created: a1 (fresh)');
+  it('返回按名称排序的全局技能与完整性', async () => {
+    const ctx = makePluginCtx({ complete: false });
+    apply(ctx as never, {});
+    const response = await ctx._routes[0]?.fetch(new Request('http://x/api/skill-folder/skills'));
+    expect(response?.status).toBe(200);
+    const body = (await response?.json()) as { complete: boolean; skills: { name: string }[] };
+    expect(body.complete).toBe(false);
+    expect(body.skills.map((skill) => skill.name)).toEqual([
+      'chrome-devtools',
+      'lark-doc',
+      'lark-sheet',
+    ]);
   });
 
-  it('读取失败时保持原状并记录警告', () => {
-    const { ctx, config } = setup();
-    config.prefix.set('   ');
-    ctx._emit('loader/volatile-update', [['prefix']]);
-    expect([...ctx._activeTools][0]?.description).toContain('demo');
-    expect(ctx._loggerCalls.some((c) => c.level === 'warn')).toBe(true);
+  it('路由读取全局集合：不传工作区与作用域', async () => {
+    const ctx = makePluginCtx();
+    const seen: Record<string, unknown>[] = [];
+    ctx.snapshot = async (input) => {
+      seen.push(input);
+      return { skills: ctx.skillsFixture, complete: true };
+    };
+    apply(ctx as never, {});
+    await ctx._routes[0]?.fetch(new Request('http://x/api/skill-folder/skills'));
+    expect(seen).toEqual([{}]);
   });
 
-  it('插件卸载时注销工具', () => {
-    const { ctx } = setup();
-    ctx._dispose();
-    expect(ctx._activeTools.size).toBe(0);
+  it('读取失败时返回 500 与错误', async () => {
+    const ctx = makePluginCtx();
+    ctx.snapshot = undefined;
+    apply(ctx as never, {});
+    const response = await ctx._routes[0]?.fetch(new Request('http://x/api/skill-folder/skills'));
+    if (response === undefined) throw new Error('路由没有返回响应');
+    expect(response.status).toBe(500);
+    expect(((await response.json()) as { error: string }).error).toContain('没有技能快照');
+  });
+
+  it('connection 不可用时不注册路由', () => {
+    const ctx = makePluginCtx({ connection: false });
+    apply(ctx as never, {});
+    expect(ctx._routes).toEqual([]);
+  });
+});
+
+describe('检索选项热更新', () => {
+  it('保存后新摘要长度作用于检索结果', async () => {
+    const long = [
+      {
+        name: 'chrome-devtools',
+        description: '长'.repeat(500),
+        invocation: { modelInvocable: true, userInvocable: true },
+        source: 'user-agents',
+        provider: 'filesystem',
+        path: 'C:/Users/me/.agents/skills/chrome-devtools/SKILL.md',
+      },
+    ];
+    const ctx = makePluginCtx({ skills: long });
+    const descriptionMaxLength = volatile(320);
+    apply(ctx as never, { descriptionMaxLength });
+    descriptionMaxLength.set(40);
+    ctx._emit('loader/volatile-update', [['descriptionMaxLength']]);
+    const tool = ctx._registeredTools.filter((entry) => entry.name === 'skill_search').at(-1);
+    const result = (await tool?.execute(
+      { query: 'chrome-devtools' },
+      { agent: { id: 'a' }, signal: new AbortController().signal },
+    )) as { results: { description: string }[] } | undefined;
+    expect(Array.from(result?.results[0]?.description ?? '')).toHaveLength(40);
   });
 });

@@ -15,6 +15,7 @@ const root = process.env.RDT_PROFILE_DIR ?? dirname(fileURLToPath(import.meta.ur
 const REPO = process.env.RDT_REPO;
 if (!REPO) throw new Error('RDT_REPO 必填：插件仓库绝对路径，例如 <drive>:/path/to/<repo>');
 const PLUGIN = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).name;
+const ROUTE = '/api/skill-folder/skills';
 const dshPkg =
   process.env.RDT_DSH_PKG ??
   join(execSync('npm root -g', { encoding: 'utf8' }).trim(), '@deepseek-ai', 'dsh', 'package.json');
@@ -57,12 +58,14 @@ const entry = [...app.loader.entries()].find((e) => e.options.name === PLUGIN);
 const results = [];
 const handles = [];
 
-/** cordis fiber 状态：2 为已激活，3 为 apply 抛错。 */
+/** cordis fiber 状态：2 为已激活。 */
 const FIBER_ACTIVE = 2;
-const FIBER_FAILED = 3;
 
-/** 测试使用的基础配置。 */
-const base = { prefix: 'rdt' };
+/** 测试使用的基础配置：不折叠任何技能。 */
+const base = { folders: [] };
+
+/** 用例之间共享的现场：从真实技能目录里挑出的全局技能名。 */
+const state = { available: [], chosen: [] };
 
 /** 热更新插件配置并等待插件重新激活。 */
 async function config(patch = {}) {
@@ -82,7 +85,7 @@ async function create(id) {
 }
 
 /** 发送一条用户消息并等待本轮结束，返回本轮的模型请求。 */
-async function turn(agent, text, timeout = 20000) {
+async function turn(agent, text, timeout = 60000) {
   const n = adapter.calls.length;
   agent.followup(
     createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }),
@@ -106,6 +109,9 @@ async function turn(agent, text, timeout = 20000) {
   return calls;
 }
 
+/** 发一条普通消息，返回本轮请求。 */
+const probe = (agent) => turn(agent, '实机测试：请回复');
+
 /** 会话事件列表。新版宿主提供 snapshotEvents()，旧版只有 events 属性。 */
 const events = (agent) =>
   typeof agent.session.snapshotEvents === 'function'
@@ -114,10 +120,46 @@ const events = (agent) =>
 
 /** 会话事件中指定类型的事件。 */
 const typed = (agent, type) => events(agent).filter((e) => e.type === type);
-/** 工具结果的文本。 */
-const toolResults = (agent) => typed(agent, 'tool/result').map((e) => plain([e.data.message]));
-/** 请求中是否携带被测工具。 */
-const hasTool = (call) => (call.tools ?? []).some((t) => t.name === TOOL_NAME);
+
+/** 请求中携带的工具定义。 */
+const toolDef = (call) => (call.tools ?? []).find((t) => t.name === TOOL_NAME);
+
+/** 从本轮请求里取出模型看到的技能目录。 */
+function catalogOf(calls) {
+  const text = plain(calls.flatMap((call) => call.messages ?? []));
+  const available = /<available_skills>([\s\S]*?)<\/available_skills>/.exec(text)?.[1];
+  const folders = /<skill_folders>([\s\S]*?)<\/skill_folders>/.exec(text)?.[1];
+  const names = [...(available ?? '').matchAll(/^- `([^`]+)`/gm)].map((m) => m[1]);
+  return { text, available, folders, names };
+}
+
+/** 唯一的工具结果：错误文本与是否失败。 */
+function toolOutcome(agent) {
+  const list = typed(agent, 'tool/result');
+  assert.equal(list.length, 1, `本轮应有 1 条工具结果，实际 ${list.length}`);
+  const event = list[0];
+  const message = event.data.message;
+  return {
+    event,
+    text: plain([message]),
+    isError: message?.isError === true || event.data.error !== undefined,
+  };
+}
+
+/** 成功的工具结果：解析渲染文本首行的 JSON。 */
+function toolPayload(agent) {
+  const outcome = toolOutcome(agent);
+  assert(!outcome.isError, `工具报错：${outcome.text}`);
+  const line = outcome.text.split('\n', 1)[0];
+  try {
+    return { ...outcome, data: JSON.parse(line) };
+  } catch {
+    throw new Error(`工具结果首行不是 JSON：${line}`);
+  }
+}
+
+/** 本轮请求调用工具时使用的消息文本。 */
+const searchCase = (args) => `SEARCH_CASE:${JSON.stringify(args)}`;
 
 /** 运行一条用例并记录结果。 */
 async function check(label, fn) {
@@ -129,6 +171,26 @@ async function check(label, fn) {
     results.push({ label, status: 'FAIL', error: e?.stack ?? String(e) });
     console.error('FAIL', label, e?.stack ?? e);
   }
+}
+
+/** 记一条跳过：缺少全局技能时用，不算失败。 */
+function skip(label, reason) {
+  results.push({ label, status: 'SKIP', note: reason });
+  console.log('SKIP', label, reason);
+}
+
+/** 全局技能名：配置页路由与检索都读同一份快照。 */
+async function globalSkillNames() {
+  const snapshot = await app.get('skills')?.snapshot({});
+  return (snapshot?.skills ?? [])
+    .filter((skill) => skill.invocation?.modelInvocable === true)
+    .map((skill) => skill.name);
+}
+
+/** 取本轮可折叠的全局技能名：真实全局技能 ∩ 模型目录里列出的名称。 */
+async function foldableNames(calls) {
+  const global = new Set(await globalSkillNames());
+  return catalogOf(calls).names.filter((name) => global.has(name));
 }
 
 try {
@@ -143,93 +205,214 @@ try {
     );
     const installed = join(root, 'node_modules', PLUGIN);
     const version = (dir) => JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).version;
-    assert.equal(version(installed), version(REPO), '已安装版本与仓库不一致');
+    assert.equal(version(installed), version(REPO), '加载的版本与仓库不一致');
     const hash = (f) => createHash('sha256').update(readFileSync(f)).digest('hex').slice(0, 12);
     const sha = hash(join(installed, 'dist', 'index.mjs'));
-    assert.equal(sha, hash(join(REPO, 'dist', 'index.mjs')), '已安装 dist 与仓库 dist 不一致');
+    // RDT_PATCHED_DIST=1：已安装副本带临时补丁，用于隔离插件缺陷的影响面
+    if (process.env.RDT_PATCHED_DIST === '1') {
+      return { version: version(installed), sha, repoDist: hash(join(REPO, 'dist', 'index.mjs')) };
+    }
+    assert.equal(sha, hash(join(REPO, 'dist', 'index.mjs')), '加载产物与仓库 dist 不一致');
     return { version: version(installed), sha };
   });
   if (results.at(-1)?.status !== 'PASS') throw new Error('装载失败，中止后续用例');
 
-  await check('B1 模型调用 demo_echo 并收到回显', async () => {
+  await check('B1 首个请求携带 skill_search 工具定义', async () => {
     await config();
-    const a = await create('rdt-echo');
-    const calls = await turn(a, 'ECHO_CASE:hello');
-    assert(hasTool(calls[0]), '首个请求未携带 demo_echo');
-    assert.equal(calls.length, 2, '应为工具调用与最终回复两次请求');
-    const out = toolResults(a);
-    assert.equal(out.length, 1);
-    assert.equal(out[0], `[rdt] (session ${a.id}) hello`);
-    return { toolResult: out[0] };
-  });
-
-  await check('B2 热更新 prefix 后回显使用新前缀', async () => {
-    const uid = entry.fiber?.uid;
-    await config({ prefix: 'hot' });
-    assert.equal(entry.fiber.state, FIBER_ACTIVE);
-    assert.equal(entry.fiber?.uid, uid, 'volatile 配置不应重新挂载插件');
-    const a = await create('rdt-prefix');
-    await turn(a, 'ECHO_CASE:again');
-    const out = toolResults(a);
-    assert(out[0]?.startsWith('[hot] '), `回显前缀错误：${out[0]}`);
-    return { toolResult: out[0], sameInstance: true };
-  });
-
-  await check('B3 demoEnabled=false 时工具不出现在请求中', async () => {
-    await config({ demoEnabled: false });
-    assert.equal(entry.fiber.state, FIBER_ACTIVE);
-    const a = await create('rdt-disabled');
-    const calls = await turn(a, 'ECHO_CASE:off');
-    assert(!calls.some(hasTool), '停用后请求仍携带 demo_echo');
-    assert.equal(toolResults(a).length, 0);
-    return { requests: calls.length };
-  });
-
-  await check('B4 未知配置键使插件加载失败，恢复后重新激活', async () => {
-    // 新版宿主把 apply 异常记在 fiber.state，旧版直接在 update 时抛出
-    let rejected = false;
-    try {
-      await config({ unknownKey: 1 });
-    } catch (e) {
-      rejected = true;
-      assert.match(String(e), /unknown config key/, `错误信息应指出未知键：${e}`);
+    const a = await create('rdt-tool');
+    const calls = await turn(a, '实机测试：请回复');
+    assert.equal(calls.length, 1, `首个请求应为 1 次，实际 ${calls.length}`);
+    const tool = toolDef(calls[0]);
+    assert(tool, `首个请求未携带 ${TOOL_NAME}`);
+    const properties = tool.parameters?.properties ?? {};
+    for (const key of ['query', 'folder', 'limit', 'offset']) {
+      assert(properties[key], `工具参数缺少 ${key}`);
     }
-    if (!rejected) assert.equal(entry.fiber.state, FIBER_FAILED, '未知键时插件应处于加载失败状态');
-    const a = await create('rdt-bad-config');
-    const calls = await turn(a, 'ECHO_CASE:bad');
-    assert(!calls.some(hasTool), '加载失败时请求仍携带 demo_echo');
-    await config();
-    assert.equal(entry.fiber.state, FIBER_ACTIVE, '恢复配置后插件应重新激活');
-    return { rejectedAtUpdate: rejected, recovered: true };
+    assert.equal(properties.limit.type, 'integer', 'limit 应为整数');
+    assert.match(String(tool.description), /skill/i, '工具说明应描述技能检索');
+    // 现场：本轮目录列出的名称，供后续用例挑真实技能
+    const catalog = catalogOf(calls);
+    state.available = await foldableNames(calls);
+    // 第二名的存在让文件夹成员断言有意义
+    state.chosen = state.available.slice(0, 2);
+    assert(catalog.available !== undefined, '请求中没有 <available_skills> 目录');
+    return {
+      tool: TOOL_NAME,
+      parameters: Object.keys(properties),
+      availableSkills: catalog.names.length,
+      globalSkills: state.available.length,
+    };
   });
 
-  await check('B5 热重载不重启：工具随配置重新注册', async () => {
-    await config({ prefix: 'rdt', demoEnabled: true });
-    const uid = entry.fiber?.uid;
-    assert(uid, '插件未激活');
-    const description = () => app.tools.get(TOOL_NAME)?.description ?? '';
+  await check('B2 query 检索返回按相关度排序的结果', async () => {
+    const [chosen] = state.chosen;
+    if (chosen === undefined) {
+      skip('B2 query 检索返回按相关度排序的结果', '宿主里没有可检索的全局技能');
+      return undefined;
+    }
+    await config();
+    const a = await create('rdt-query');
+    await turn(a, searchCase({ query: chosen }));
+    const { data } = toolPayload(a);
+    assert(data.results.length > 0, `查询 ${chosen} 没有结果`);
+    assert.equal(data.results[0].name, chosen, `首位应是 ${chosen}，实际 ${data.results[0].name}`);
+    assert.equal(data.results[0].match, 'exact', '准确名称命中应标记为 exact');
+    assert.equal(data.query, chosen, `结果应回显查询词 ${chosen}`);
+    assert.equal(data.folder, null, '未限定文件夹时 folder 应为 null');
+    assert(
+      typeof data.total === 'number' && data.total >= data.results.length,
+      'total 应不小于本页条数',
+    );
+    return { query: chosen, total: data.total, first: data.results[0] };
+  });
 
-    await config({ demoEnabled: true, prefix: 'live' });
-    assert.equal(entry.fiber?.uid, uid, '改 prefix 后插件被重新挂载');
-    assert(description().includes('live'), `工具说明未使用新前缀：${description()}`);
+  await check('B3 folder 检索列出该文件夹成员', async () => {
+    if (state.chosen.length === 0) {
+      skip('B3 folder 检索列出该文件夹成员', '宿主里没有可折叠的全局技能');
+      return undefined;
+    }
+    const members = state.chosen;
+    await config({
+      folders: [{ name: 'rdt-folder', description: '实机测试文件夹', skills: members }],
+    });
+    assert.equal(entry.fiber.state, FIBER_ACTIVE, '配置文件夹后插件应仍然激活');
+    const a = await create('rdt-folder');
+    await turn(a, searchCase({ folder: 'rdt-folder' }));
+    const { data } = toolPayload(a);
+    assert.equal(data.folder, 'rdt-folder', `结果应回显文件夹名，实际 ${data.folder}`);
+    assert.equal(data.query, null, '只给 folder 时 query 应为 null');
+    const names = data.results.map((hit) => hit.name);
+    assert.deepEqual(
+      names,
+      [...members].sort(),
+      `成员应为 ${members.join(', ')}，实际 ${names.join(', ')}`,
+    );
+    assert(
+      data.results.every((hit) => hit.folder === 'rdt-folder' && hit.match === 'folder'),
+      '按文件夹列出时每条结果都应标记 folder',
+    );
+    return { folder: 'rdt-folder', members: names };
+  });
 
-    await config({ demoEnabled: false, prefix: 'live' });
-    assert.equal(entry.fiber?.uid, uid, '注销工具时插件被重新挂载');
-    assert.equal(app.tools.get(TOOL_NAME), undefined, '关闭后工具仍然注册');
+  await check('B4 既无 query 也无 folder 时报工具错误', async () => {
+    await config();
+    const a = await create('rdt-noargs');
+    await turn(a, searchCase({}));
+    const outcome = toolOutcome(a);
+    assert(outcome.isError, `应报工具错误，实际返回：${outcome.text}`);
+    assert.match(
+      outcome.text,
+      /provide query or folder/,
+      `错误信息应指出缺少参数：${outcome.text}`,
+    );
+    return { error: outcome.text.slice(0, 200) };
+  });
 
-    await config({ demoEnabled: true, prefix: 'back' });
-    assert.equal(entry.fiber?.uid, uid, '注册工具时插件被重新挂载');
-    assert(description().includes('back'), `工具未按新前缀重新注册：${description()}`);
+  await check('B5 limit 超出 1–20 时报工具错误', async () => {
+    await config();
+    const a = await create('rdt-badlimit');
+    const query = state.chosen[0] ?? 'skill';
+    await turn(a, searchCase({ query, limit: 99 }));
+    const outcome = toolOutcome(a);
+    assert(outcome.isError, `应报工具错误，实际返回：${outcome.text}`);
+    assert.match(
+      outcome.text,
+      /limit must be an integer from 1 to 20/,
+      `错误信息应指出 limit 越界：${outcome.text}`,
+    );
+    return { error: outcome.text.slice(0, 200) };
+  });
 
-    const a = await create('rdt-hot');
-    await turn(a, 'ECHO_CASE:hot');
-    assert.equal(toolResults(a)[0], `[back] (session ${a.id}) hot`);
-    return { uid, prefix: 'back' };
+  await check('B6 配置文件夹后请求目录折叠为 <skill_folders>', async () => {
+    const [chosen] = state.chosen;
+    if (chosen === undefined) {
+      skip('B6 配置文件夹后请求目录折叠为 <skill_folders>', '宿主里没有可折叠的全局技能');
+      return undefined;
+    }
+    await config({ folders: [{ name: 'rdt-fold', description: '实机测试', skills: [chosen] }] });
+    const a = await create('rdt-fold');
+    const calls = await probe(a);
+    const catalog = catalogOf(calls);
+    assert(catalog.available !== undefined, '请求中没有 <available_skills> 目录');
+    assert(catalog.folders !== undefined, '请求中没有 <skill_folders> 块');
+    assert(
+      catalog.folders.includes('rdt-fold'),
+      `<skill_folders> 未列出 rdt-fold：${catalog.folders}`,
+    );
+    assert(
+      catalog.folders.includes('1 skills'),
+      `<skill_folders> 未给出成员数：${catalog.folders}`,
+    );
+    assert(!catalog.names.includes(chosen), `${chosen} 已折叠，但 <available_skills> 仍列出了它`);
+    return { folder: 'rdt-fold', foldedSkill: chosen, listedSkills: catalog.names.length };
+  });
+
+  await check('B7 folders 为空时目录保持原生列表', async () => {
+    await config({ folders: [] });
+    const a = await create('rdt-plain');
+    const calls = await probe(a);
+    const catalog = catalogOf(calls);
+    assert(catalog.available !== undefined, '请求中没有 <available_skills> 目录');
+    assert.equal(catalog.folders, undefined, `空配置不应产生 <skill_folders>：${catalog.folders}`);
+    const [chosen] = state.chosen;
+    if (chosen !== undefined) {
+      assert(catalog.names.includes(chosen), `空配置下 ${chosen} 应逐项列出`);
+    }
+    return { listed: catalog.names.length, folded: false };
+  });
+
+  await check('B8 运行中的服务器返回全局技能 JSON', async () => {
+    const webServer = app.get('webServer');
+    assert(webServer, '缺少 webServer 服务');
+    assert.equal(typeof webServer.getOrigin, 'function', 'webServer 没有 getOrigin()');
+    const origin = webServer.getOrigin();
+    const connection = app.get('connection');
+    assert(connection, '缺少 connection 服务');
+    assert.equal(
+      typeof connection.authenticatedUrl,
+      'function',
+      'connection 没有 authenticatedUrl()',
+    );
+    // 浏览器的第一条请求用启动 token 换会话 cookie，之后的同源请求带 cookie
+    const handshake = await fetch(connection.authenticatedUrl(`${origin}/`), {
+      redirect: 'manual',
+    });
+    const cookies = (handshake.headers.getSetCookie?.() ?? []).map((c) => c.split(';', 1)[0]);
+    assert(cookies.length > 0, `启动 token 未换到会话 cookie：HTTP ${handshake.status}`);
+    const response = await fetch(`${origin}${ROUTE}`, {
+      headers: { cookie: cookies.join('; ') },
+    });
+    assert.equal(response.status, 200, `${ROUTE} 返回 HTTP ${response.status}`);
+    const body = await response.json();
+    assert(
+      Array.isArray(body.skills),
+      `响应缺少 skills 数组：${JSON.stringify(body).slice(0, 200)}`,
+    );
+    assert.equal(typeof body.complete, 'boolean', '响应缺少 complete 布尔值');
+    assert(body.skills.length > 0, '全局技能列表为空');
+    assert(
+      body.skills.every(
+        (skill) => typeof skill.name === 'string' && typeof skill.source === 'string',
+      ),
+      '技能条目缺少 name 或 source',
+    );
+    const [chosen] = state.chosen;
+    if (chosen !== undefined) {
+      assert(
+        body.skills.some((skill) => skill.name === chosen),
+        `路由返回的列表缺少 ${chosen}`,
+      );
+    }
+    return { status: response.status, skills: body.skills.length, complete: body.complete };
   });
 
   writeFileSync(join(root, 'results.json'), JSON.stringify(results, null, 2));
   const fail = results.filter((r) => r.status === 'FAIL').length;
-  console.log('RDT_DONE', JSON.stringify({ pass: results.length - fail, fail }));
+  const skipCount = results.filter((r) => r.status === 'SKIP').length;
+  console.log(
+    'RDT_DONE',
+    JSON.stringify({ pass: results.length - fail - skipCount, fail, skip: skipCount }),
+  );
   if (process.env.RDT_KEEPALIVE === '1') {
     console.log('RDT_KEEPALIVE');
   } else {
@@ -239,30 +422,6 @@ try {
 } catch (e) {
   console.error(e);
   writeFileSync(join(root, 'fatal.txt'), e?.stack ?? String(e));
-  await check('B5 热重载不重启：工具随配置重新注册', async () => {
-    await config({ prefix: 'rdt', demoEnabled: true });
-    const uid = entry.fiber?.uid;
-    assert(uid, '插件未激活');
-    const description = () => app.tools.get(TOOL_NAME)?.description ?? '';
-
-    await config({ demoEnabled: true, prefix: 'live' });
-    assert.equal(entry.fiber?.uid, uid, '改 prefix 后插件被重新挂载');
-    assert(description().includes('live'), `工具说明未使用新前缀：${description()}`);
-
-    await config({ demoEnabled: false, prefix: 'live' });
-    assert.equal(entry.fiber?.uid, uid, '注销工具时插件被重新挂载');
-    assert.equal(app.tools.get(TOOL_NAME), undefined, '关闭后工具仍然注册');
-
-    await config({ demoEnabled: true, prefix: 'back' });
-    assert.equal(entry.fiber?.uid, uid, '注册工具时插件被重新挂载');
-    assert(description().includes('back'), `工具未按新前缀重新注册：${description()}`);
-
-    const a = await create('rdt-hot');
-    await turn(a, 'ECHO_CASE:hot');
-    assert.equal(toolResults(a)[0], `[back] (session ${a.id}) hot`);
-    return { uid, prefix: 'back' };
-  });
-
   writeFileSync(join(root, 'results.json'), JSON.stringify(results, null, 2));
   await runtime.shutdown.shutdown(1);
 }

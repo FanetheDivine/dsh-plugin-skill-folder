@@ -24,15 +24,10 @@ jobs:
       - name: Run Full check
         run: pnpm run full-check
 
-  # 模板阶段禁用发布：模板本身不是可用插件。
-  # 模板转化时解禁，步骤见 docs/template-conversion.md：
-  # 清空 package.json 的 version -> 恢复下面注释的 if、删掉 if: false
-  # -> 提醒用户把 npm Trusted Publisher 绑定到新仓库与 .github/workflows/ci.yml。
   publish:
     name: Publish to npm (trusted publishing)
     needs: check
-    # if: startsWith(github.ref, 'refs/tags/')
-    if: false
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       id-token: write   # npm OIDC 换取发布令牌 / 生成 provenance
       contents: read

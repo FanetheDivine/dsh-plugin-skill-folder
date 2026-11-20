@@ -29,6 +29,17 @@
 | 多次运行报 `SessionAlreadyExistsError` | 固定 sessionId 与上轮落盘会话冲突 | `run-test.mjs` 启动时清理 `test-sessions` |
 | 驱动找不到 `lib/profile-boot.js` | 旧版宿主只提供带 hash 的文件名 | `run-test.mjs` 按导出的 `runProfile` 查找 |
 
+## 热更新
+
+| 现象 | 原因 | 处理 |
+| --- | --- | --- |
+| 构建后插件行为不变 | profile 不是链接安装，或 `cordis.patch.yml` 缺 `hmr` 条目 | 确认 `node_modules/<插件>` 指向仓库；确认补丁含 `- id: hmr` 与 `root: ["<repo>/dist"]` |
+| 构建后插件不可用 | 新产物导入或启动失败 | 修正代码后重新构建，HMR 会再次导入并恢复 |
+| 构建后毫无变化 | 只改了 `src`，没有构建 | 运行 `pnpm build` 或保持 `pnpm dev` 运行 |
+| 前端改动不生效 | 宿主轮询产物有延迟，或 `dist/client.js` 未更新 | 等待数秒；确认构建产物已更新 |
+| 仓库在点目录下时监听不到 | HMR 默认忽略 `**/.*` | 把仓库放在不含点目录的路径，或在 `hmr` 配置中调整 `ignored` |
+| 同一轮里手工改过 `cordis.patch.yml` | 宿主按补丁重新组合，可能重载插件 | 补丁改动后按新配置重跑用例 |
+
 ## 浏览器
 
 `browser-test.mjs` 用 Playwright 驱动无头 Chrome。界面标签随宿主语言变化，脚本按中英文两套标签依次尝试。定位依据：
@@ -37,18 +48,24 @@
 | --- | --- |
 | 输入框 | `textarea` 或 `[contenteditable="true"]` 的第一个 |
 | 发送按钮 | `getByRole('button', { name: '发送消息' })` |
-| 本轮折叠行 | 文本匹配 `已完成` |
-| 工具分组 | `getByRole('button', { name: '已调用工具' })` |
+| 插件卡片 | `[data-plugin-package="<包名>"]` |
+| 包详情入口 | `getByRole('button', { name: '查看 <显示名>' })` |
+| 行配置入口 | `getByRole('button', { name: '配置 <行标题>' })`，行标题取元数据标题，缺失时为行 id |
+| 行配置页 | `[data-plugin-config]` |
 | 插件启用开关 | `getByRole('switch', { name: '启用 <插件名>' })`，状态读 `aria-checked` |
+| 技能文件夹页 | `[data-skill-folder-page]`、`[data-skill-folder-options]`、`[data-ungrouped]`、`[data-folder-card="<文件夹名>"]`、`[data-skill-chip="<技能名>"]` |
+| 搜索选项输入框 | 按标签定位：默认返回数量、摘要长度上限 |
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
 | 打开 GUI 先出现「预览版说明」或「内测声明」弹窗 | 欢迎弹窗只在配置的版本号与宿主常量完全一致时隐藏 | `setup-env.sh` 从宿主读取该常量写入配置；`browser-test.mjs` 会自动点「继续」 |
-| 工具卡片看不到 `demo_echo` | 工具调用折叠在「已完成，用时 N」与「已调用工具」两层展开项里 | 脚本先展开这两层再断言 |
+| 配置页读不到技能列表 | 全局技能列表路由依赖 `connection` 服务，服务缺失或鉴权失败时页面显示 `role="alert"` 的错误提示 | 先跑后端 B8 确认路由可用，再排查页面 |
+| 数值输入框找不到 | 两个数值字段渲染为 `type="text"` 加 `inputMode="numeric"`，不是 `type="number"` | 按标签定位，断言 `inputmode` 与取值 |
+| 文件夹名称输入框内容没有变化 | 卡片以下标定位，改名后 `data-folder-card` 随之变化，旧选择器失效 | 改名后按新名称重新定位卡片 |
 | 插件页没有插件详情入口 | 部分宿主版本只提供行内启用开关与提示气泡 | 断言「已安装插件」列出插件、开关为开 |
 | 插件页按包名找不到插件 | 插件页显示元数据里的标题，不显示包名 | 卡片用 `data-plugin-package="<包名>"` 定位；按钮标签按语言从 `locale/<语言>.json` 的 `meta.title` 拼出，缺失时回落包名 |
 | 保存配置后 `cordis.patch.yml` 未更新 | 宿主异步写盘，2 秒内可能未落盘 | 轮询读取补丁文件，最多 15 秒 |
-| 旧版宿主没有插件页 | 插件管理在「设置」中 | 跳过 C2 用例 |
+| 旧版宿主没有插件页 | 插件管理在「设置」中 | 跳过 C1 及之后的浏览器用例 |
 | GUI 每次启动 token 不同 | token 每次轮换 | 用 `gui-up.sh` 导出的 `RDT_GUI_URL` |
 | 旧版宿主日志里没有 token | 旧版默认不启用访问令牌 | `gui-up.sh` 直接使用日志中的地址 |
 | 打开页面返回 401 | 未带 token 访问 | 使用 `RDT_GUI_URL` 的完整地址 |

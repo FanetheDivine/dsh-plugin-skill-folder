@@ -15,10 +15,31 @@ pnpm 的 minimum release age 策略会拒绝发布时间过短的包。
 
 ## 共享宿主实例
 
-插件运行时使用宿主提供的 cordis、dsh-tools 与 zod。
+插件运行时使用宿主提供的 cordis 与 schemastery。
 
 - 这些包被打进 bundle 时会产生第二份实例，类型判断和服务注入随之失效。
-- 保持 external 的规则见 [how-it-works.md](./how-it-works.md#依赖复用)。
+- 保持 external 的规则见 [how-it-works.md](./how-it-works.md#依赖归属)。
+
+## 与 skill-search-local 冲突
+
+两个插件都注册 `skill_search`，工具名只有一个。
+
+- 先注册的一方保留工具名，后注册的一方失效。
+- 文件夹配置只作用于本插件的工具与目录改写。
+- 安装前停用 `dsh-skill-search-local`，见 README 的「安装」。
+
+## 原生目录格式
+
+目录改写依赖 `dsh-tool-skill` 的消息结构。
+
+- 只依赖 `source.kind === 'skill-catalog'` 与 `source.entries`；两者缺失或变形时目录保持原样，不报错。
+- 原生首句与加载指引的措辞会变化；本插件替换为正则无关的固定文本，不解析原生措辞。
+- `skill-catalog` 来源类型变化时，目录不再折叠，`skill_search` 仍可用。
+
+## 触屏与拖拽
+
+- `@dnd-kit/core` 的指针传感器按鼠标与触控笔设计；触屏可长按拖动，也可能被页面滚动打断。
+- 「移动到」下拉框不依赖拖拽，任何输入方式都可用。
 
 ## 前端产物
 

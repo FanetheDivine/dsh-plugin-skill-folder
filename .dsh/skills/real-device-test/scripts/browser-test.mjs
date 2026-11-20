@@ -1,5 +1,5 @@
-// 实机测试浏览器驱动：用 Playwright 驱动无头 Chrome 打开 GUI，执行对话、插件页与配置页流程。
-// 用法：在 profile 目录运行 node browser-test.mjs；RDT_REPO 必填，RDT_GUI_URL 由 gui-up.sh 导出。
+// 实机测试浏览器驱动：用 Playwright 驱动无头 Chrome 打开 GUI，执行插件页与技能文件夹配置页流程。
+// 用法：在仓库目录运行 node browser-test.mjs；RDT_REPO 必填，RDT_GUI_URL 由 gui-up.sh 导出。
 // env：RDT_HEADLESS=0 显示浏览器；RDT_SHOTS 截图目录，默认 profile 目录下的 shots。
 // 结果写入 browser-results.json，全部通过时退出码为 0。
 
@@ -28,7 +28,7 @@ const DISPLAY_NAMES = [
     PLUGIN,
   ]),
 ];
-/** 为每个显示名拼出带前缀的按钮标签，如「查看 插件模板」。 */
+/** 为每个显示名拼出带前缀的按钮标签，如「查看 技能文件夹」。 */
 const withNames = (prefixes) =>
   prefixes.flatMap((prefix) => DISPLAY_NAMES.map((name) => `${prefix} ${name}`));
 const shots = process.env.RDT_SHOTS ?? join(root, 'shots');
@@ -37,21 +37,15 @@ mkdirSync(shots, { recursive: true });
 /** GUI 的中英文标签，按顺序尝试，取第一个存在的。 */
 const LABELS = {
   welcome: ['继续', 'Continue'],
-  workspace: ['选择工作区', 'Choose workspace'],
-  send: ['发送消息', 'Send message'],
-  newSession: ['新建会话', 'New session'],
   plugins: ['插件', 'Plugins'],
   installed: ['已安装插件', 'Installed plugins'],
   view: ['查看', 'View'],
   configure: ['配置', 'Configure'],
-  turn: /已完成|Completed/,
-  toolGroup: ['已调用工具', 'Called tools'],
-  save: ['保存', 'Save'],
-  prefixLabel: ['回显前缀', 'Echo prefix'],
-  invalidPrefix: [
-    '前缀需要至少一个非空白字符。',
-    'The prefix needs at least one non-blank character.',
-  ],
+  createFolder: ['新建文件夹', 'New folder'],
+  folderName: ['文件夹名称', 'Folder name'],
+  ungrouped: ['未分组的技能', 'Ungrouped skills'],
+  defaultLimit: ['默认返回数量', 'Default result count'],
+  descriptionMaxLength: ['摘要长度上限', 'Summary length limit'],
 };
 
 const results = [];
@@ -80,9 +74,6 @@ async function dismissWelcome(page) {
   }
   return false;
 }
-
-/** 输入框。hero 与已打开的会话都只有一个可编辑元素。 */
-const composer = (page) => page.locator('textarea, [contenteditable="true"]').first();
 
 /** 按中英文标签依次尝试点击一个按钮。 */
 async function clickLabel(page, names, exact = true) {
@@ -114,32 +105,25 @@ async function openRowConfig(page) {
     throw new Error(`找不到 ${PLUGIN} 行的配置入口`);
   }
   await page.locator('[data-plugin-config]').waitFor({ state: 'visible', timeout: 30000 });
+  await page.locator('[data-skill-folder-page]').waitFor({ state: 'visible', timeout: 30000 });
 }
 
-/** 在配置页里按标签找控件：`switch` 与 `button` 按角色找，其余按关联标签找。 */
-async function configControl(page, names, role = 'label') {
+/** 在配置页里按标签找一个输入框。 */
+async function fieldByLabel(page, names) {
   for (const name of names) {
-    const control =
-      role === 'switch'
-        ? page.getByRole('switch', { name, exact: true })
-        : role === 'button'
-          ? page.getByRole('button', { name, exact: true })
-          : page.getByLabel(name, { exact: true });
-    if (await control.count()) return control.first();
+    const field = page.getByLabel(name, { exact: true });
+    if (await field.count()) return field.first();
   }
-  throw new Error(`找不到控件：${names.join(' / ')}`);
+  throw new Error(`找不到输入框：${names.join(' / ')}`);
 }
 
-/** 新建会话，发送带前缀标记的消息，等待工具回显。 */
-async function sendEcho(page, marker, timeout = 60000) {
-  if (!(await clickLabel(page, LABELS.newSession))) throw new Error('找不到新建会话入口');
-  await page.waitForTimeout(2000);
-  const box = composer(page);
-  await box.waitFor({ state: 'visible' });
-  await box.click();
-  await box.fill(`ECHO_CASE:${marker}`);
-  await clickLabel(page, LABELS.send, false);
-  await page.getByText(`mock：工具返回 [${marker}]`, { exact: false }).first().waitFor({ timeout });
+/** 配置页里按标签找一个按钮。 */
+async function buttonByLabel(page, names) {
+  for (const name of names) {
+    const button = page.getByRole('button', { name, exact: true });
+    if (await button.count()) return button.first();
+  }
+  throw new Error(`找不到按钮：${names.join(' / ')}`);
 }
 
 const browser = await chromium.launch({
@@ -157,60 +141,7 @@ try {
   const dismissed = await dismissWelcome(page);
   console.log('GUI 已加载', JSON.stringify({ welcome: dismissed }));
 
-  await check('C1 对话冒烟：工具卡片与回复', async () => {
-    // 工作区未就绪时先选择测试仓库
-    const placeholder = await composer(page).getAttribute('placeholder');
-    if (placeholder && /选择.*工作区|Choose a workspace/.test(placeholder)) {
-      await page.getByRole('button', { name: LABELS.workspace[0] }).first().click();
-      await page.waitForTimeout(1500);
-      await page.getByRole('treeitem').first().click();
-      await page.waitForTimeout(2000);
-    }
-    const box = composer(page);
-    await box.click();
-    await box.fill('ECHO_CASE:gui');
-    await clickLabel(page, LABELS.send, false);
-    // 前缀由持久化配置决定，只断言回显形状
-    await page
-      .getByText(/mock：工具返回 \[[^\]]+\]/)
-      .first()
-      .waitFor({ timeout: 60000 });
-    await page.screenshot({ path: join(shots, 'c1-reply.png'), fullPage: true });
-
-    // 展开本轮，读取工具卡片
-    const turn = page.getByText(LABELS.turn).last();
-    if (await turn.count()) {
-      await turn.click();
-      await page.waitForTimeout(1200);
-    }
-    for (const name of LABELS.toolGroup) {
-      const btn = page.getByRole('button', { name });
-      if (await btn.count()) {
-        await btn.first().click();
-        await page.waitForTimeout(1200);
-        break;
-      }
-    }
-    const text = await page.locator('body').innerText();
-    if (!/demo_echo/.test(text)) throw new Error('对话中没有 demo_echo 工具卡片');
-    await page.screenshot({ path: join(shots, 'c1-toolcard.png'), fullPage: true });
-    return { reply: true, toolCard: 'demo_echo' };
-  });
-
-  await check('C3 前端示例：输入区上方出现示例行且可交互', async () => {
-    const row = page.locator('[data-dsh-template-demo]');
-    await row.waitFor({ state: 'visible', timeout: 30000 });
-    const counter = row.locator('[data-dsh-template-demo-count]');
-    const before = (await counter.innerText()).trim();
-    await row.getByRole('button').first().click();
-    await page.waitForTimeout(500);
-    const after = (await counter.innerText()).trim();
-    if (before === after) throw new Error(`点击后计数未变化：${before}`);
-    await page.screenshot({ path: join(shots, 'c3-demo-dock.png'), fullPage: true });
-    return { before, after };
-  });
-
-  await check('C2 插件页：被测插件已安装且启用', async () => {
+  await check('C1 插件页：被测插件已安装且启用', async () => {
     await openPluginsPage(page);
     // 插件清单首次加载要读取整个宿主包树，可能超过 10 秒；等到已安装区出现再断言
     await page.getByText(LABELS.installed[0], { exact: false }).first().waitFor({ timeout: 60000 });
@@ -221,65 +152,91 @@ try {
     const toggle = card.getByRole('switch');
     if (!(await toggle.count())) throw new Error(`${PLUGIN} 没有启用开关`);
     const enabled = (await toggle.first().getAttribute('aria-checked')) === 'true';
-    await page.screenshot({ path: join(shots, 'c2-plugins.png'), fullPage: true });
+    await page.screenshot({ path: join(shots, 'c1-plugins.png'), fullPage: true });
     if (!enabled) throw new Error(`${PLUGIN} 的启用开关为关闭状态`);
     return { plugin: PLUGIN, listed: true, enabled };
   });
 
-  await check('C4 配置页：改前缀保存后热重载生效', async () => {
+  await check('C2 配置页：渲染技能文件夹设置', async () => {
     await openRowConfig(page);
-    const toggle = await configControl(page, ['启用 demo 工具', 'Enable the demo tool'], 'switch');
-    if ((await toggle.getAttribute('aria-checked')) !== 'true')
-      throw new Error('demo 开关初始应为开');
-    const prefix = await configControl(page, LABELS.prefixLabel);
-    // 取一个与当前值不同的前缀，重复运行也能观察到变化
-    const current = await prefix.inputValue();
-    const next = current === 'gui' ? 'gui2' : 'gui';
-    await prefix.fill(next);
-    const save = await configControl(page, LABELS.save, 'button');
-    if (await save.isDisabled()) throw new Error('改前缀后保存按钮应可用');
-    await save.click();
-    // 宿主异步写盘，最多轮询 15 秒
-    let patch = '';
-    for (let waited = 0; waited < 15000; waited += 500) {
-      await page.waitForTimeout(500);
-      patch = readFileSync(join(root, 'cordis.patch.yml'), 'utf8');
-      if (patch.includes(`prefix: ${next}`)) break;
-    }
-    if (!patch.includes(`prefix: ${next}`)) throw new Error(`cordis.patch.yml 未写入 ${next}`);
-    await page.screenshot({ path: join(shots, 'c4-config.png'), fullPage: true });
-
-    // 不重启 GUI：新会话的工具回显已使用新前缀
-    await sendEcho(page, next);
-    await page.screenshot({ path: join(shots, 'c4-echo.png'), fullPage: true });
-    return { prefix: next, patch: 'cordis.patch.yml' };
+    const pageRoot = page.locator('[data-skill-folder-page]');
+    const create = await buttonByLabel(page, LABELS.createFolder);
+    if (!(await create.isVisible())) throw new Error('「新建文件夹」按钮不可见');
+    // 未分组区域是放置区，同时承载全部未归组技能
+    const ungrouped = page.locator('[data-ungrouped]');
+    await ungrouped.waitFor({ state: 'visible', timeout: 30000 });
+    await page.screenshot({ path: join(shots, 'c2-page.png'), fullPage: true });
+    return {
+      page: await pageRoot.count(),
+      createButton: LABELS.createFolder[0],
+      ungrouped: await ungrouped.getAttribute('aria-label'),
+    };
   });
 
-  await check('C5 空白前缀被拒绝，无效草稿不写入', async () => {
-    /** profile 补丁里写入的前缀。 */
-    const storedPrefix = () => {
-      const patch = readFileSync(join(root, 'cordis.patch.yml'), 'utf8');
-      return /^\s*prefix:\s*(.*)$/m.exec(patch)?.[1] ?? '';
-    };
-    await openRowConfig(page);
-    const before = storedPrefix();
-    const prefix = await configControl(page, LABELS.prefixLabel);
-    await prefix.fill('   ');
+  await check('C3 新建文件夹并输入名称', async () => {
+    const create = await buttonByLabel(page, LABELS.createFolder);
+    await create.click();
+    const card = page.locator('[data-folder-card]').first();
+    await card.waitFor({ state: 'visible', timeout: 10000 });
+    const name = `rdt-${Date.now().toString(36).slice(-5)}`;
+    const input = await fieldByLabel(page, LABELS.folderName);
+    await input.click();
+    await input.fill(name);
     await page.waitForTimeout(500);
-    const save = await configControl(page, LABELS.save, 'button');
-    if (!(await save.isDisabled())) throw new Error('空白前缀时保存按钮应禁用');
-    const text = await page.locator('[data-plugin-config]').innerText();
-    const shown = LABELS.invalidPrefix.some((message) => text.includes(message));
-    if (!shown) throw new Error('没有显示非法前缀提示');
-    if (storedPrefix() !== before)
-      throw new Error(`空白草稿改变了配置：${before} -> ${storedPrefix()}`);
-    await page.screenshot({ path: join(shots, 'c5-invalid.png'), fullPage: true });
+    const value = await input.inputValue();
+    if (value !== name) throw new Error(`名称输入框内容为 ${value}，期望 ${name}`);
+    // 卡片用文件夹名标记自身，改名后标记随之变化
+    const renamed = page.locator(`[data-folder-card="${name}"]`);
+    await renamed.waitFor({ state: 'visible', timeout: 10000 });
+    await page.screenshot({ path: join(shots, 'c3-folder.png'), fullPage: true });
+    return { folders: await page.locator('[data-folder-card]').count(), name };
+  });
 
-    // 保存合法前缀，保证重复运行时的初始状态稳定
-    await prefix.fill('rdt');
-    await save.click();
-    await page.waitForTimeout(2500);
-    return { invalidRejected: true, restored: 'rdt' };
+  await check('C4 配置页：数值字段存在且带默认值', async () => {
+    const options = page.locator('[data-skill-folder-options]');
+    await options.waitFor({ state: 'visible', timeout: 30000 });
+    const limit = await fieldByLabel(page, LABELS.defaultLimit);
+    const maxLength = await fieldByLabel(page, LABELS.descriptionMaxLength);
+    const values = {
+      defaultLimit: await limit.inputValue(),
+      descriptionMaxLength: await maxLength.inputValue(),
+    };
+    if (!/^\d+$/.test(values.defaultLimit))
+      throw new Error(`默认返回数量不是整数：${values.defaultLimit}`);
+    if (!/^\d+$/.test(values.descriptionMaxLength)) {
+      throw new Error(`摘要长度上限不是整数：${values.descriptionMaxLength}`);
+    }
+    // 两个字段都是数值输入
+    for (const [label, field] of [
+      ['默认返回数量', limit],
+      ['摘要长度上限', maxLength],
+    ]) {
+      if ((await field.getAttribute('inputmode')) !== 'numeric') {
+        throw new Error(`${label} 不是数值输入`);
+      }
+    }
+    await page.screenshot({ path: join(shots, 'c4-options.png'), fullPage: true });
+    return values;
+  });
+
+  await check('C5 未分组技能来自技能列表路由', async () => {
+    const ungrouped = page.locator('[data-ungrouped]');
+    await ungrouped.waitFor({ state: 'visible', timeout: 30000 });
+    // 页面加载技能失败时此行是 role=alert 的错误提示
+    if (await page.locator('[data-skill-folder-page] [role="alert"]').count()) {
+      const text = await page
+        .locator('[data-skill-folder-page] [role="alert"]')
+        .first()
+        .innerText();
+      throw new Error(`配置页报告错误：${text}`);
+    }
+    const chips = ungrouped.locator('[data-skill-chip]');
+    await chips.first().waitFor({ state: 'visible', timeout: 30000 });
+    const count = await chips.count();
+    if (count === 0) throw new Error('未分组区域没有技能条目');
+    const first = await chips.first().getAttribute('data-skill-chip');
+    await page.screenshot({ path: join(shots, 'c5-chips.png'), fullPage: true });
+    return { chips: count, first };
   });
 } catch (e) {
   console.error(e);

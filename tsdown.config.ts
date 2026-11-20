@@ -15,7 +15,7 @@ const PLATFORM_MODULES = [
 ] as const;
 
 /** 浏览器产物注册 id，必须与 package.json 的 name 一致。 */
-const CLIENT_ID = 'dsh-plugin-template';
+const CLIENT_ID = 'dsh-plugin-skill-folder';
 
 /**
  * 两组构建：
@@ -29,7 +29,7 @@ const CLIENT_ID = 'dsh-plugin-template';
  */
 export default defineConfig([
   {
-    name: 'dsh-plugin-template/host',
+    name: 'dsh-plugin-skill-folder/host',
     entry: ['src/index.ts'],
     outDir: 'dist',
     format: ['esm'],
@@ -46,7 +46,7 @@ export default defineConfig([
     clean: true,
   },
   {
-    name: 'dsh-plugin-template/client',
+    name: 'dsh-plugin-skill-folder/client',
     entry: { client: 'src/client/index.ts' },
     outDir: 'dist',
     format: 'cjs',
@@ -54,6 +54,8 @@ export default defineConfig([
     target: 'es2024',
     dts: false,
     clean: false,
+    // 内联的 npm 依赖（如 @dnd-kit）按 NODE_ENV 选择产物；浏览器没有 process，构建时替换为常量
+    define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     deps: {
       // 平台种子不得内联；其余依赖（含 devDependencies）一律内联，
       // 宿主模块表里没有的 require 会在运行时直接抛错。

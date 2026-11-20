@@ -2,34 +2,29 @@
 
 ## Unreleased
 
-### Changed
+### Added
 
-- Spec Kit 主流程在探索后按依赖分批访谈，规格与计划经用户批准或豁免后推进，任务与实现复核未决项
-- 实机测试驱动按插件页的 `data-plugin-package` 与元数据标题定位插件，配置保存改为轮询补丁文件
-- 前端入口不再声明必需服务，`locale`、`slots`、`configForms` 按功能用 `ctx.inject` 分组加载，缺失时跳过对应功能
-- `pnpm check` 的 lint 只报告 error 级诊断，`test:code` 换用 `minimal` reporter 并隐藏通过用例的日志
-- `pnpm build` 的 `test:dist` 换用 `minimal` reporter 并隐藏通过用例的日志
-- 宪章升到 v2.0.0，只保留宿主依赖版本、测试同步、文档结构、质量门禁、公开引用五条原则：
-  - 原则 I 宿主依赖版本：全部 `@deepseek-ai/*` 依赖以同版本 `@deepseek-ai/dsh` 为准，`dsh-*` 锁定同一确切版本并列入 `minimumReleaseAgeExclude`
-  - 宿主契约、依赖归属、严格配置移入 `docs/how-it-works.md`，国际化约束移入 `docs/i18n.md`
-- `AGENTS.md` 新增模板说明节，链接模板转化文档
-- `AGENTS.md` 新增主工作区节：主工作区位于 `main` 且干净，只运行 `git fetch` 与 `git pull`，任何变更在 worktree 中进行
-- `/speckit-worktree-create` 在创建 worktree 前、`/speckit-worktree-finish` 在清理后，把主工作区 `main` 快进到 `origin/main`
-- `/speckit-worktree-create` 创建 spec 时同步远程全部分支并推送占号分支，同号时按分支名自动改号；`/speckit-worktree-finish` 在推送与 PR 前校验编号唯一
-- `publish` job 改用 Node 24 自带的 npm，删除 `npm install -g npm@latest` 步骤
+- 内置 `skill_search` 工具：按关键词或文件夹名检索可由模型调用的技能，返回摘要、所属文件夹与检索完整性
+- 技能文件夹折叠：模型目录用文件夹的名称、简介与数量替代已折叠的成员，未归组的技能继续逐项展示
+- 「技能文件夹」配置页：列出全局技能与文件夹，支持拖拽分组、下拉移动、新建、改名、删除与逐字段恢复默认
+- 按前缀自动分组：先按文件夹名匹配，其余按 `-` 分段前缀合并，成员不少于 2 个才成组
+- `GET /api/skill-folder/skills` 路由：向配置页提供全局技能摘要与检索完整性
+- `docs/` 与 README 说明安装、分组、自动分组、搜索与加载流程
 
 ### Fixed
 
-- 包内容测试解析 `npm pack --json` 的两种形状：npm 11 的数组与 npm 12 的以包名为键的对象
+- `skill_search` 的可空输出字段改用 `oneOf` 表达，宿主的 JSON Schema 子集不接受类型数组，旧写法让插件无法激活
+- 技能列表读取中时，未分组区域显示读取提示，不再提前显示「全部技能都已分组」
 
-### Added
+### Changed
 
-- `docs/template-conversion.md`：变更类别、模板变更要求与模板转化步骤
-- `tests/dependency-versions.test.ts`：回归 `dsh-*` 依赖版本一致与 `minimumReleaseAgeExclude` 条目
-- `.specify/extensions/worktree/scripts/bash/sync-main.sh`：检查主工作区并快进 `main` 到 `origin/main`
-- `tests/sync-main.test.ts`：覆盖 `sync-main.sh` 的同步与拒绝场景
-- `.specify/extensions/worktree/scripts/bash/spec-number-lib.sh`：spec 编号解析与同号分支匹配
-- `.specify/extensions/worktree/scripts/bash/check-spec-number.sh`：交付前的编号唯一性校验
-- `tests/worktree-extension.test.ts`：占号、自动改号、远程分支同步与交付前校验用例
-- `tests/support/pack-report.ts`：把 `npm pack --json` 的报告归一为文件路径列表
-- `tests/pack-report.test.ts`：覆盖打包报告的数组与对象形状、缺 `files` 与非法形状
+- 仓库从 DSH 插件模板转化为 `dsh-plugin-skill-folder@0.1.0`，移除模板示例工具、事件日志与示例行
+- 宪章标题改为 `dsh-plugin-skill-folder Constitution`，版本升到 2.0.1
+- CI 恢复 `publish` job 的 tag 触发条件
+- 实机测试改为验证技能检索、目录折叠、技能列表路由与配置页，测试 profile 启用原生技能工具与全局技能来源
+- 单元测试的工具注册桩按宿主规则校验 JSON Schema 子集
+
+### Removed
+
+- 模板示例 `demo_echo` 工具、agent 事件日志示例、输入区示例行与示例配置页
+- `docs/template-conversion.md` 与历史 spec、changelog 归档

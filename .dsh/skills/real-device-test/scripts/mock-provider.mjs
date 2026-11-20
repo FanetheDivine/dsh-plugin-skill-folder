@@ -1,8 +1,8 @@
 // 实机测试 mock provider：无网络，按用户消息中的标记返回脚本化响应。
 // 模型：mock-model。
 // 标记：
-//   ECHO_CASE:<文本>  首次请求调用 demo_echo，收到工具结果后用文本回复结果
-//   其他消息          回复「mock：已收到」
+//   SEARCH_CASE:<JSON 参数>  首次请求调用 skill_search，收到工具结果后用文本回复结果
+//   其他消息                 回复「mock：已收到」
 // 每次请求都追加到 profile 目录的 requests.jsonl，供事后核对。
 import { execSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -22,7 +22,10 @@ export const name = 'rdt-mock';
 export const inject = ['llm'];
 
 /** 被测工具名。 */
-export const TOOL_NAME = 'demo_echo';
+export const TOOL_NAME = 'skill_search';
+
+/** 用例标记：标记后是技能检索的工具参数 JSON。 */
+export const MARKER = /SEARCH_CASE:(\S+)/;
 
 /** 提取消息中的全部文本，包含工具结果里的文本。 */
 function blockTexts(content) {
@@ -37,6 +40,16 @@ export function plain(messages) {
     .filter(Boolean)
     .flatMap((m) => blockTexts(m.content))
     .join('\n');
+}
+
+/** 把标记后的文本解析成工具参数：不是 JSON 时当作 query。 */
+function markerArgs(text) {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed !== null && typeof parsed === 'object' ? parsed : { query: text };
+  } catch {
+    return { query: text };
+  }
 }
 
 export function apply(ctx) {
@@ -76,7 +89,7 @@ export function apply(ctx) {
       // 宿主会在用户消息后追加运行时上下文，因此读取最后一条 assistant 之后的全部用户消息
       const lastAssistant = o.messages.map((m) => m.role).lastIndexOf('assistant');
       const userText = plain(o.messages.slice(lastAssistant + 1).filter((m) => m.role === 'user'));
-      const marker = /ECHO_CASE:(\S+)/.exec(userText);
+      const marker = MARKER.exec(userText);
 
       // 收到工具结果：把结果作为最终回复。新版宿主用 tool 角色，旧版放进 user 消息的 tool-result 块
       const hasToolResult =
@@ -97,7 +110,7 @@ export function apply(ctx) {
             type: 'tool-call',
             id: `mock-${this.calls.length}`,
             name: TOOL_NAME,
-            arguments: JSON.stringify({ text: marker[1] }),
+            arguments: JSON.stringify(markerArgs(marker[1])),
           },
         };
         yield usage(20);
