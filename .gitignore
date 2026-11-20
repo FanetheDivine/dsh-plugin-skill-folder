@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+*.zip
+.DS_Store
+Thumbs.db
+
+# Spec Kit: extension dev cache; nested worktrees (each is a full checkout, committed on its own branch)
+.specify/extensions/*/.specify-dev/
+worktrees/
