@@ -45,6 +45,14 @@ GUI 会话使用 agent preset，preset 自带 `tool-skill` 与 `skill-filesystem
 - 副本 profile 只需停用根作用域的 `tool-skill`；技能工具与技能来源由 preset 提供。
 - 实机脚本以官方 web 默认 profile 为底本，不覆写这两个插件，用例 `B0` 守住该形态。
 
+## 配置页技能列表
+
+配置页按默认 preset 的作用域读取全局技能。
+
+- 宿主没有 `agentPresets` 服务时只能读根作用域，根层之外的技能不出现。
+- 默认 preset 不挂 `skill-filesystem` 时，用户级技能不出现。
+- 取作用域失败时退回根作用域，页面显示「技能列表可能不完整」。
+
 ## 触屏与拖拽
 
 - `@dnd-kit/core` 的指针传感器按鼠标与触控笔设计；触屏可长按拖动，也可能被页面滚动打断。

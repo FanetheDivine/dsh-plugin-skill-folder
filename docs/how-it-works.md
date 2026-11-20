@@ -49,7 +49,7 @@ DSH 插件是一个 npm 包。宿主按约定的入口加载它。
 1. `readConfig` 读取配置当前值，非法值让插件加载失败。
 2. 注册 `skill_search`，工具闭包读取当前配置。
 3. 用 `prepend: true` 注册 `agent/pre-step` 监听，改写本次步骤的技能目录。
-4. 经 `ctx.inject(['connection'])` 注册全局技能列表路由。
+4. 经 `ctx.inject(['connection'])` 注册全局技能列表路由；路由按默认 preset 的作用域读取技能。
 
 ### 目录改写
 
@@ -107,7 +107,15 @@ DSH 插件是一个 npm 包。宿主按约定的入口加载它。
 
 `GET /api/skill-folder/skills` 使用 `connection.fetch.register`。请求经过宿主的连接鉴权，只对已登录浏览器开放。
 
-路由读取全局技能时不传 `cwd` 与 `scope`：`dsh-skill-filesystem` 只在传入 `cwd` 时扫描项目根目录。返回按名称排序的、可由模型调用的全局技能与 `complete` 标记。
+路由先用 `agentPresets.acquireScope()` 取默认 preset 的作用域，再按该作用域读取快照：`dsh-skill-filesystem` 注册在 agent preset 内，根作用域快照看不到它提供的用户级技能。读取结束后释放作用域租约。
+
+| 情况 | 读取方式 | `complete` |
+| --- | --- | --- |
+| 正常 | `snapshot({ scope })` | 取自快照 |
+| 取作用域失败 | 退回 `snapshot({})` | `false` |
+| 宿主没有 `agentPresets` | `snapshot({})` | 取自快照 |
+
+不传 `cwd`，项目根目录因此不参与。返回按名称排序的、可由模型调用的全局技能与 `complete` 标记。
 
 ## 依赖归属
 
