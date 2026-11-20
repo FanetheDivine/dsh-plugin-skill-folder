@@ -15,7 +15,7 @@ const PLATFORM_MODULES = [
 ] as const;
 
 /** 浏览器产物注册 id，必须与 package.json 的 name 一致。 */
-const CLIENT_ID = 'dsh-plugin-template';
+const CLIENT_ID = 'dsh-plugin-skill-folder';
 
 /**
  * 两组构建：
@@ -29,7 +29,7 @@ const CLIENT_ID = 'dsh-plugin-template';
  */
 export default defineConfig([
   {
-    name: 'dsh-plugin-template/host',
+    name: 'dsh-plugin-skill-folder/host',
     entry: ['src/index.ts'],
     outDir: 'dist',
     format: ['esm'],
@@ -46,7 +46,7 @@ export default defineConfig([
     clean: true,
   },
   {
-    name: 'dsh-plugin-template/client',
+    name: 'dsh-plugin-skill-folder/client',
     entry: { client: 'src/client/index.ts' },
     outDir: 'dist',
     format: 'cjs',

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Plugin template",
-    "description": "Demonstrates DSH plugin host tools and front-end wiring: a demo_echo tool, agent event logs, a configuration page in the Plugins panel, and a demo row above the composer."
+    "title": "Skill folders",
+    "description": "Group global skills into folders so the model catalog lists each folder's name, description and member count instead of every folded member. Folded skills stay reachable through skill_search followed by skill. Drag to group, auto-group by prefix, and apply on save."
   }
 }

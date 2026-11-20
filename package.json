@@ -1,16 +1,19 @@
 {
-  "name": "dsh-plugin-template",
-  "version": "0.0.3",
+  "name": "dsh-plugin-skill-folder",
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "description": "Group global skills into folders so the model catalog lists folder summaries instead of every folded member",
   "keywords": [
     "dsh",
     "deepseek",
     "harness",
     "plugin",
-    "template"
+    "skill",
+    "skills",
+    "folder"
   ],
   "exports": {
     ".": {
@@ -37,7 +40,6 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-plugin-manager",
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-settings"
@@ -70,7 +72,6 @@
     "@deepseek-ai/dsh-agent": "0.2.2-rc.3",
     "@deepseek-ai/dsh-client-locale": "0.2.2-rc.3",
     "@deepseek-ai/dsh-client-store": "0.2.2-rc.3",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.2.2-rc.3",
     "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.2-rc.3",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.2-rc.3",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.2-rc.3",
@@ -78,6 +79,7 @@
     "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.3",
     "@deepseek-ai/dsh-tools": "0.2.2-rc.3",
     "@deepseek-ai/schemastery": "~3.19.0",
+    "@dnd-kit/core": "6.3.1",
     "@types/node": "^24.19.2",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
