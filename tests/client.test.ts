@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseSkillsPayload } from '../src/client/api.ts';
 import { autoGroup as autoGroupFolders } from '../src/client/auto-group.ts';
 import { type FolderFormState, ROW_ID, ROW_KEY } from '../src/client/folder-form.ts';
-import { FolderPage } from '../src/client/folder-page.tsx';
+import { collapsedAfterRemoval, FolderPage, filterSkillNames } from '../src/client/folder-page.tsx';
 import * as clientEntry from '../src/client/index.ts';
 import { en, NS, zh } from '../src/client/locales.ts';
 import { type ClientServiceName, makeClientCtx } from './helpers.ts';
@@ -204,6 +204,13 @@ describe('配置页渲染', () => {
     expect(html).toContain('Save');
   });
 
+  it('文件夹提供带可访问名称与展开状态的折叠按钮', () => {
+    const html = renderPage('page', zh);
+    expect(html).toMatch(/<button[^>]*aria-label="折叠 lark"[^>]*aria-expanded="true"/);
+    expect(html).toContain('data-folder-members="lark"');
+    expect(html).toContain('共 1 个技能');
+  });
+
   it('成员带「移动到」下拉框，选项包含未分组与全部文件夹', () => {
     const html = renderPage('page', zh);
     expect(html).toMatch(/<select[^>]*aria-label="移动到 lark-doc"/);
@@ -278,6 +285,29 @@ describe('配置页渲染', () => {
   it('有未保存修改时显示放弃按钮', () => {
     expect(renderPage('page', zh, pageState({ dirty: true }))).toContain('放弃修改');
     expect(renderPage('page', zh)).not.toContain('放弃修改');
+  });
+});
+
+describe('配置页临时视图状态', () => {
+  it('筛选同时匹配名称与描述，并忽略大小写和首尾空白', () => {
+    const descriptions = new Map([
+      ['lark-doc', 'Manage documents'],
+      ['lark-sheet', 'Manage sheets'],
+      ['x-calendar', 'Calendar tools'],
+    ]);
+    expect(
+      filterSkillNames(['lark-doc', 'lark-sheet', 'x-calendar'], descriptions, ' LARK-DOC '),
+    ).toEqual(['lark-doc']);
+    expect(
+      filterSkillNames(['lark-doc', 'lark-sheet', 'x-calendar'], descriptions, 'sheets'),
+    ).toEqual(['lark-sheet']);
+    expect(filterSkillNames(['lark-doc'], descriptions, 'missing')).toEqual([]);
+  });
+
+  it('删除文件夹后折叠下标跟随原文件夹移动', () => {
+    expect([...collapsedAfterRemoval(new Set([1, 3]), 1)]).toEqual([2]);
+    expect([...collapsedAfterRemoval(new Set([0, 2]), 0)]).toEqual([1]);
+    expect([...collapsedAfterRemoval(new Set([0, 1]), 3)]).toEqual([0, 1]);
   });
 });
 

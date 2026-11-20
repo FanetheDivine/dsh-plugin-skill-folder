@@ -19,9 +19,11 @@ import {
   cardHeaderStyle,
   cardStyle,
   chipListStyle,
+  collapseIconStyle,
   errorStyle,
   folderNameInputStyle,
   hintStyle,
+  iconButtonStyle,
   inputStyle,
   invalidInputStyle,
   textButtonStyle,
@@ -38,6 +40,12 @@ export interface FolderCardProps {
   index: number;
   /** 文件夹。 */
   folder: FolderConfig;
+  /** 当前筛选后可见的成员。 */
+  visibleSkills: readonly string[];
+  /** 是否折叠成员列表。 */
+  collapsed: boolean;
+  /** 是否正在筛选。 */
+  filterActive: boolean;
   /** 全部文件夹名，用于成员的下拉框。 */
   folderNames: readonly string[];
   /** 技能名到描述的映射，缺失的成员标为未找到。 */
@@ -56,6 +64,8 @@ export interface FolderCardProps {
   onDescribe: (index: number, description: string) => void;
   /** 删除。 */
   onRemove: (index: number) => void;
+  /** 切换成员列表折叠状态。 */
+  onToggle: (index: number) => void;
   /** 移动技能。 */
   onMove: (skill: string, target: string | null) => void;
 }
@@ -93,6 +103,28 @@ export function FolderCard(props: FolderCardProps) {
       aria-label={folder.name}
     >
       <div style={cardHeaderStyle}>
+        <button
+          type="button"
+          style={iconButtonStyle}
+          aria-label={t(props.collapsed ? 'folder.expand' : 'folder.collapse', {
+            name: folder.name || t('folder.name'),
+          })}
+          aria-expanded={!props.collapsed}
+          aria-controls={`${id}-members`}
+          onClick={() => {
+            props.onToggle(index);
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              ...collapseIconStyle,
+              transform: props.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+            }}
+          >
+            ▾
+          </span>
+        </button>
         <input
           id={`${id}-name`}
           aria-label={t('folder.name')}
@@ -111,7 +143,12 @@ export function FolderCard(props: FolderCardProps) {
         />
         <div style={cardActionsStyle}>
           <span style={badgeStyle}>
-            {t('folder.members', { count: String(folder.skills.length) })}
+            {props.filterActive
+              ? t('folder.visibleMembers', {
+                  visible: String(props.visibleSkills.length),
+                  total: String(folder.skills.length),
+                })
+              : t('folder.members', { count: String(folder.skills.length) })}
           </span>
           <button
             type="button"
@@ -140,11 +177,18 @@ export function FolderCard(props: FolderCardProps) {
           props.onDescribe(index, event.target.value);
         }}
       />
-      <div style={chipListStyle}>
+      <div
+        id={`${id}-members`}
+        style={chipListStyle}
+        data-folder-members={folder.name}
+        hidden={props.collapsed}
+      >
         {folder.skills.length === 0 ? (
           <span style={hintStyle}>{t('folder.empty')}</span>
+        ) : props.visibleSkills.length === 0 ? (
+          <span style={hintStyle}>{t('folder.noMatches')}</span>
         ) : (
-          folder.skills.map((skill) => (
+          props.visibleSkills.map((skill) => (
             <SkillChip
               key={skill}
               name={skill}

@@ -55,12 +55,12 @@
 
 ### Tests for User Story 2
 
-- [ ] T008 [US2] 在 `tests/client.test.ts` 添加全区域筛选、结果计数、清除、折叠标记和删除后下标调整的失败测试
+- [x] T008 [US2] 在 `tests/client.test.ts` 添加全区域筛选、结果计数、清除、折叠标记和删除后下标调整的失败测试
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] 在 `src/client/folder-page.tsx` 集中计算文件夹可见成员、未分组可见成员、结果计数与清除动作
-- [ ] T010 [US2] 在 `src/client/folder-card.tsx` 添加带 `aria-expanded` 的折叠按钮，折叠时只隐藏成员区域并保留放置区
+- [x] T009 [US2] 在 `src/client/folder-page.tsx` 集中计算文件夹可见成员、未分组可见成员、结果计数与清除动作
+- [x] T010 [US2] 在 `src/client/folder-card.tsx` 添加带 `aria-expanded` 的折叠按钮，折叠时只隐藏成员区域并保留放置区
 
 **Checkpoint**: 任意技能可由统一筛选定位，折叠不修改配置草稿
 

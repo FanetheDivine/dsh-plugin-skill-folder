@@ -126,6 +126,28 @@ function matchesFilter(name: string, description: string, filter: string): boole
   return name.toLowerCase().includes(needle) || description.toLowerCase().includes(needle);
 }
 
+/** 返回名称或描述匹配当前筛选词的技能，保持原顺序。 */
+export function filterSkillNames(
+  names: readonly string[],
+  descriptions: ReadonlyMap<string, string>,
+  filter: string,
+): string[] {
+  return names.filter((name) => matchesFilter(name, descriptions.get(name) ?? '', filter));
+}
+
+/** 删除文件夹后调整折叠下标，让状态继续属于原文件夹。 */
+export function collapsedAfterRemoval(
+  collapsed: ReadonlySet<number>,
+  removedIndex: number,
+): Set<number> {
+  const result = new Set<number>();
+  for (const index of collapsed) {
+    if (index === removedIndex) continue;
+    result.add(index > removedIndex ? index - 1 : index);
+  }
+  return result;
+}
+
 /** 未分组区域为空时的提示：列表未就绪时不下「全部已分组」的结论。 */
 function ungroupedEmptyText(
   status: SkillsState['status'],
@@ -192,6 +214,7 @@ export function FolderPage(props: FolderPageProps) {
   const form = props.useConfigForm((value) => value);
   const { state: skillsState, retry } = useSkills(props.loadSkills);
   const [filter, setFilter] = useState('');
+  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor),
@@ -214,16 +237,29 @@ export function FolderPage(props: FolderPageProps) {
     () => folders.map((folder) => folder.name).filter((name) => name.trim() !== ''),
     [folders],
   );
-  const ungrouped = useMemo(
+  const allUngrouped = useMemo(
     () =>
       ungroupedOf(
         folders,
         skills.map((skill) => skill.name),
-      ).filter((name) => matchesFilter(name, descriptions.get(name) ?? '', filter)),
-    [folders, skills, descriptions, filter],
+      ),
+    [folders, skills],
   );
+  const visibleFolderSkills = useMemo(
+    () => folders.map((folder) => filterSkillNames(folder.skills, descriptions, filter)),
+    [folders, descriptions, filter],
+  );
+  const ungrouped = useMemo(
+    () => filterSkillNames(allUngrouped, descriptions, filter),
+    [allUngrouped, descriptions, filter],
+  );
+  const totalCount =
+    folders.reduce((count, folder) => count + folder.skills.length, 0) + allUngrouped.length;
+  const visibleCount =
+    visibleFolderSkills.reduce((count, names) => count + names.length, 0) + ungrouped.length;
+  const filterActive = filter.trim() !== '';
 
-  const { moveSkill } = props;
+  const { moveSkill, removeFolder } = props;
   const onDragEnd = useCallback(
     (event: DragEndEvent) => {
       const over = event.over?.id;
@@ -238,6 +274,21 @@ export function FolderPage(props: FolderPageProps) {
       if (target !== undefined) moveSkill(skill, target.name);
     },
     [folders, moveSkill],
+  );
+  const toggleCollapsed = useCallback((index: number) => {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
+  const onRemoveFolder = useCallback(
+    (index: number) => {
+      setCollapsed((current) => collapsedAfterRemoval(current, index));
+      removeFolder(index);
+    },
+    [removeFolder],
   );
 
   if (props.view === 'summary') return t('page.summary');
@@ -300,6 +351,25 @@ export function FolderPage(props: FolderPageProps) {
                 setFilter(event.target.value);
               }}
             />
+            <span style={badgeStyle} role="status" aria-live="polite">
+              {filterActive
+                ? t('filter.results', {
+                    visible: String(visibleCount),
+                    total: String(totalCount),
+                  })
+                : t('filter.total', { total: String(totalCount) })}
+            </span>
+            {filterActive ? (
+              <button
+                type="button"
+                style={buttonStyle}
+                onClick={() => {
+                  setFilter('');
+                }}
+              >
+                {t('filter.clear')}
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -340,6 +410,9 @@ export function FolderPage(props: FolderPageProps) {
                   key={folderDropId(index)}
                   index={index}
                   folder={folder}
+                  visibleSkills={visibleFolderSkills[index] ?? []}
+                  collapsed={collapsed.has(index)}
+                  filterActive={filterActive}
                   folderNames={folderNames}
                   descriptions={descriptions}
                   loaded={skillsState.status === 'ready'}
@@ -348,7 +421,8 @@ export function FolderPage(props: FolderPageProps) {
                   t={t}
                   onRename={props.renameFolder}
                   onDescribe={props.describeFolder}
-                  onRemove={props.removeFolder}
+                  onRemove={onRemoveFolder}
+                  onToggle={toggleCollapsed}
                   onMove={props.moveSkill}
                 />
               ))}
