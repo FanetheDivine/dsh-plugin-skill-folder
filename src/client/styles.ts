@@ -4,20 +4,122 @@
  */
 import type { CSSProperties } from 'react';
 
-/** 页面纵向栈。 */
+/** 页面纵向栈，限制内容宽度并允许窄屏收缩。 */
 export const pageStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 16,
-  padding: '4px 0',
+  gap: 20,
+  width: '100%',
+  maxWidth: 1200,
+  minWidth: 0,
+  margin: '0 auto',
+  padding: '8px 0',
+  boxSizing: 'border-box',
 };
 
-/** 工具栏：按钮与筛选框一行排列，窄屏折行。 */
+/** 页面标题与用途说明。 */
+export const pageHeaderStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+};
+
+/** 页面主标题。 */
+export const pageTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 18,
+  fontWeight: 600,
+  lineHeight: 1.4,
+  color: 'var(--dsw-alias-label-primary)',
+};
+
+/** 页面用途说明。 */
+export const pageDescriptionStyle: CSSProperties = {
+  margin: 0,
+  maxWidth: 720,
+  fontSize: 13,
+  lineHeight: '20px',
+  color: 'var(--dsw-alias-label-secondary)',
+};
+
+/** 分组操作与筛选所在的工具面板。 */
 export const toolbarStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'center',
   gap: 8,
+  padding: 12,
+  border: '0.5px solid var(--dsw-alias-border-l2)',
+  borderRadius: 10,
+  background: 'var(--dsw-alias-bg-layer-1)',
+};
+
+/** 工具栏内的主要操作组。 */
+export const toolbarActionsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+};
+
+/** 筛选输入与结果计数的容器。 */
+export const filterGroupStyle: CSSProperties = {
+  display: 'flex',
+  flex: '1 1 240px',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: 8,
+  minWidth: 0,
+};
+
+/** 自适应文件夹卡片网格。 */
+export const folderGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
+  gap: 12,
+  alignItems: 'start',
+};
+
+/** 文件夹与未分组区域的共同容器。 */
+export const folderSectionStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  minWidth: 0,
+};
+
+/** 区块标题行。 */
+export const sectionHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+};
+
+/** 区域计数与状态 badge。 */
+export const badgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: 20,
+  padding: '0 7px',
+  borderRadius: 10,
+  background: 'var(--dsw-alias-bg-layer-2)',
+  color: 'var(--dsw-alias-label-secondary)',
+  fontSize: 11,
+  lineHeight: '18px',
+  whiteSpace: 'nowrap',
+};
+
+/** 加载、错误与警告状态的统一容器。 */
+export const statusStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 8,
+  margin: 0,
+  padding: '8px 10px',
+  border: '0.5px solid var(--dsw-alias-border-l2)',
+  borderRadius: 8,
+  background: 'var(--dsw-alias-bg-layer-1)',
 };
 
 /** 区块标题。 */
@@ -37,28 +139,58 @@ export const hintStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-secondary)',
 };
 
-/** 错误文字。 */
+/** 错误状态容器与文字。 */
 export const errorStyle: CSSProperties = {
+  ...statusStyle,
   ...hintStyle,
+  borderColor: 'var(--dsw-alias-state-error-primary)',
   color: 'var(--dsw-alias-state-error-primary)',
 };
 
-/** 警告文字。 */
+/** 警告状态容器与文字。 */
 export const warnStyle: CSSProperties = {
+  ...statusStyle,
   ...hintStyle,
+  borderColor: 'var(--dsw-alias-state-warn-primary)',
   color: 'var(--dsw-alias-state-warn-primary)',
 };
 
 /** 次级按钮。 */
 export const buttonStyle: CSSProperties = {
-  height: 28,
+  minHeight: 30,
   padding: '0 12px',
   border: '0.5px solid var(--dsw-alias-border-l2)',
   borderRadius: 6,
-  background: 'var(--dsw-alias-bg-layer-1)',
+  background: 'var(--dsw-alias-bg-layer-2)',
   color: 'var(--dsw-alias-label-primary)',
   fontSize: 12,
+  fontWeight: 500,
   cursor: 'pointer',
+};
+
+/** 主要操作按钮。 */
+export const primaryButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  borderColor: 'var(--dsw-alias-brand-primary)',
+  background: 'var(--dsw-alias-brand-primary)',
+  color: 'var(--dsw-alias-bg-base)',
+};
+
+/** 折叠等紧凑图标按钮。 */
+export const iconButtonStyle: CSSProperties = {
+  display: 'inline-flex',
+  flex: '0 0 28px',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 28,
+  height: 28,
+  padding: 0,
+  border: 'none',
+  borderRadius: 6,
+  background: 'transparent',
+  color: 'var(--dsw-alias-label-primary)',
+  cursor: 'pointer',
+  fontSize: 16,
 };
 
 /** 文字按钮，用于删除等低强调操作。 */
@@ -75,14 +207,29 @@ export const textButtonStyle: CSSProperties = {
 
 /** 单行输入框。 */
 export const inputStyle: CSSProperties = {
-  height: 28,
+  height: 30,
   minWidth: 0,
-  padding: '0 8px',
+  padding: '0 9px',
   border: '0.5px solid var(--dsw-alias-border-l2)',
   borderRadius: 6,
   background: 'var(--dsw-alias-bg-base)',
   color: 'var(--dsw-alias-label-primary)',
   fontSize: 12,
+  boxSizing: 'border-box',
+};
+
+/** 文件夹名称输入框。 */
+export const folderNameInputStyle: CSSProperties = {
+  ...inputStyle,
+  flex: '1 1 160px',
+  fontWeight: 600,
+};
+
+/** 筛选输入框。 */
+export const filterInputStyle: CSSProperties = {
+  ...inputStyle,
+  flex: '1 1 140px',
+  width: '100%',
 };
 
 /** 非法输入框。 */
@@ -95,11 +242,13 @@ export const invalidInputStyle: CSSProperties = {
 export const cardStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 8,
-  padding: 12,
+  gap: 10,
+  minWidth: 0,
+  padding: 14,
   border: '0.5px solid var(--dsw-alias-border-l2)',
-  borderRadius: 8,
+  borderRadius: 10,
   background: 'var(--dsw-alias-bg-layer-1)',
+  boxSizing: 'border-box',
 };
 
 /** 拖拽经过时的放置区高亮。 */
@@ -112,8 +261,24 @@ export const cardActiveStyle: CSSProperties = {
 /** 卡片标题行：名称、计数与删除按钮。 */
 export const cardHeaderStyle: CSSProperties = {
   display: 'flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 8,
+};
+
+/** 卡片右侧计数与操作。 */
+export const cardActionsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  marginLeft: 'auto',
+};
+
+/** 折叠箭头。 */
+export const collapseIconStyle: CSSProperties = {
+  display: 'inline-block',
+  lineHeight: 1,
+  transition: 'transform 120ms ease',
 };
 
 /** 成员列表：技能条目折行排列。 */
@@ -121,7 +286,8 @@ export const chipListStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 6,
-  minHeight: 28,
+  minHeight: 30,
+  minWidth: 0,
 };
 
 /** 一个技能条目。 */
@@ -130,11 +296,12 @@ export const chipStyle: CSSProperties = {
   alignItems: 'center',
   gap: 4,
   maxWidth: '100%',
-  height: 26,
-  padding: '0 4px 0 8px',
+  minHeight: 28,
+  padding: '2px 4px 2px 8px',
   border: '0.5px solid var(--dsw-alias-border-l1)',
-  borderRadius: 13,
+  borderRadius: 6,
   background: 'var(--dsw-alias-bg-layer-2)',
+  boxSizing: 'border-box',
   color: 'var(--dsw-alias-label-primary)',
   fontSize: 12,
   cursor: 'grab',
@@ -157,6 +324,43 @@ export const chipNameStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
+/** 独立拖拽手柄与技能名称。 */
+export const dragHandleStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  minWidth: 0,
+  padding: 0,
+  border: 0,
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  cursor: 'grab',
+  touchAction: 'none',
+};
+
+/** 拖拽手柄图标。 */
+export const dragIconStyle: CSSProperties = {
+  flexShrink: 0,
+  color: 'var(--dsw-alias-label-secondary)',
+  fontSize: 12,
+  letterSpacing: -2,
+};
+
+/** 仅供读屏播报的实时状态。 */
+export const srOnlyStyle: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
+
 /** 「移动到」下拉框。 */
 export const selectStyle: CSSProperties = {
   height: 20,
@@ -172,3 +376,28 @@ export const selectStyle: CSSProperties = {
 export const dividerStyle: CSSProperties = {
   borderTop: '0.5px solid var(--dsw-alias-border-l2)',
 };
+
+/** 搜索选项的自适应两列布局。 */
+export const optionsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
+  gap: 12,
+  paddingTop: 4,
+};
+
+/** 页面内控件的键盘焦点样式。 */
+export const focusStyleText = `
+  [data-skill-folder-page] button:focus-visible,
+  [data-skill-folder-page] input:focus-visible,
+  [data-skill-folder-page] select:focus-visible,
+  [data-skill-folder-page] [data-skill-drag-handle]:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: 2px;
+  }
+  [data-skill-folder-page] button:disabled,
+  [data-skill-folder-page] input:disabled,
+  [data-skill-folder-page] select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+`;

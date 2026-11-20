@@ -18,7 +18,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import type { FolderConfig } from '../config.ts';
 import { UNGROUPED_ID } from '../constants.ts';
@@ -30,16 +30,30 @@ import { coerceFolders, type FolderPageInjected } from './folder-form.ts';
 import type { NS } from './locales.ts';
 import { SkillChip } from './skill-chip.tsx';
 import {
+  badgeStyle,
   buttonStyle,
   cardActiveStyle,
   cardStyle,
   chipListStyle,
   dividerStyle,
   errorStyle,
+  filterGroupStyle,
+  filterInputStyle,
+  focusStyleText,
+  folderGridStyle,
+  folderSectionStyle,
   hintStyle,
-  inputStyle,
+  optionsGridStyle,
+  pageDescriptionStyle,
+  pageHeaderStyle,
   pageStyle,
+  pageTitleStyle,
+  primaryButtonStyle,
+  sectionHeaderStyle,
   sectionTitleStyle,
+  srOnlyStyle,
+  statusStyle,
+  toolbarActionsStyle,
   toolbarStyle,
   warnStyle,
 } from './styles.ts';
@@ -60,6 +74,13 @@ type SkillsState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; skills: SkillItem[]; complete: boolean };
+
+/** 渲染后需要恢复焦点的主要操作目标。 */
+type FocusTarget =
+  | { type: 'folder'; index: number }
+  | { type: 'move'; skill: string }
+  | { type: 'filter' }
+  | { type: 'create' };
 
 /** 表单框架文案。 */
 function formLabels(t: FolderPageProps['t']): SettingsFormLabels {
@@ -113,6 +134,37 @@ function matchesFilter(name: string, description: string, filter: string): boole
   return name.toLowerCase().includes(needle) || description.toLowerCase().includes(needle);
 }
 
+/** 返回名称或描述匹配当前筛选词的技能，保持原顺序。 */
+export function filterSkillNames(
+  names: readonly string[],
+  descriptions: ReadonlyMap<string, string>,
+  filter: string,
+): string[] {
+  return names.filter((name) => matchesFilter(name, descriptions.get(name) ?? '', filter));
+}
+
+/** 删除文件夹后调整折叠下标，让状态继续属于原文件夹。 */
+export function collapsedAfterRemoval(
+  collapsed: ReadonlySet<number>,
+  removedIndex: number,
+): Set<number> {
+  const result = new Set<number>();
+  for (const index of collapsed) {
+    if (index === removedIndex) continue;
+    result.add(index > removedIndex ? index - 1 : index);
+  }
+  return result;
+}
+
+/** 筛选时临时展开有匹配项的文件夹，清除后恢复原折叠状态。 */
+export function effectiveFolderCollapsed(
+  collapsed: boolean,
+  filterActive: boolean,
+  visibleCount: number,
+): boolean {
+  return collapsed && (!filterActive || visibleCount === 0);
+}
+
 /** 未分组区域为空时的提示：列表未就绪时不下「全部已分组」的结论。 */
 function ungroupedEmptyText(
   status: SkillsState['status'],
@@ -142,10 +194,10 @@ function UngroupedArea(props: {
       data-ungrouped
       aria-label={props.t('ungrouped.title')}
     >
-      <h3 style={sectionTitleStyle}>
-        {props.t('ungrouped.title')}
-        <span style={{ ...hintStyle, marginLeft: 8 }}>{String(props.names.length)}</span>
-      </h3>
+      <div style={sectionHeaderStyle}>
+        <h3 style={sectionTitleStyle}>{props.t('ungrouped.title')}</h3>
+        <span style={badgeStyle}>{String(props.names.length)}</span>
+      </div>
       <div style={chipListStyle}>
         {props.names.length === 0 ? (
           <span style={hintStyle}>{props.emptyText}</span>
@@ -179,6 +231,12 @@ export function FolderPage(props: FolderPageProps) {
   const form = props.useConfigForm((value) => value);
   const { state: skillsState, retry } = useSkills(props.loadSkills);
   const [filter, setFilter] = useState('');
+  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
+  const [pendingFocus, setPendingFocus] = useState<FocusTarget | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLInputElement>(null);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor),
@@ -201,87 +259,191 @@ export function FolderPage(props: FolderPageProps) {
     () => folders.map((folder) => folder.name).filter((name) => name.trim() !== ''),
     [folders],
   );
-  const ungrouped = useMemo(
+  const allUngrouped = useMemo(
     () =>
       ungroupedOf(
         folders,
         skills.map((skill) => skill.name),
-      ).filter((name) => matchesFilter(name, descriptions.get(name) ?? '', filter)),
-    [folders, skills, descriptions, filter],
+      ),
+    [folders, skills],
   );
+  const visibleFolderSkills = useMemo(
+    () => folders.map((folder) => filterSkillNames(folder.skills, descriptions, filter)),
+    [folders, descriptions, filter],
+  );
+  const ungrouped = useMemo(
+    () => filterSkillNames(allUngrouped, descriptions, filter),
+    [allUngrouped, descriptions, filter],
+  );
+  const totalCount =
+    folders.reduce((count, folder) => count + folder.skills.length, 0) + allUngrouped.length;
+  const visibleCount =
+    visibleFolderSkills.reduce((count, names) => count + names.length, 0) + ungrouped.length;
+  const filterActive = filter.trim() !== '';
 
-  const { moveSkill } = props;
+  const { moveSkill, removeFolder } = props;
+  const onMoveSkill = useCallback(
+    (skill: string, target: string | null) => {
+      moveSkill(skill, target);
+      setAnnouncement(
+        t('skill.moved', { name: skill, folder: target ?? t('skill.moveToUngrouped') }),
+      );
+      setPendingFocus({ type: 'move', skill });
+    },
+    [moveSkill, t],
+  );
   const onDragEnd = useCallback(
     (event: DragEndEvent) => {
       const over = event.over?.id;
       if (over === undefined) return;
       const skill = String(event.active.id);
       if (over === UNGROUPED_ID) {
-        moveSkill(skill, null);
+        onMoveSkill(skill, null);
         return;
       }
       const index = Number(String(over).slice('folder:'.length));
       const target = folders[index];
-      if (target !== undefined) moveSkill(skill, target.name);
+      if (target !== undefined) onMoveSkill(skill, target.name);
     },
-    [folders, moveSkill],
+    [folders, onMoveSkill],
   );
+  const toggleCollapsed = useCallback((index: number) => {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
+  const onRemoveFolder = useCallback(
+    (index: number) => {
+      setCollapsed((current) => collapsedAfterRemoval(current, index));
+      removeFolder(index);
+      const nextIndex = Math.min(index, folders.length - 2);
+      setPendingFocus(nextIndex >= 0 ? { type: 'folder', index: nextIndex } : { type: 'create' });
+    },
+    [folders.length, removeFolder],
+  );
+
+  // 操作导致控件卸载或移动后，把焦点接到目标位置。
+  useEffect(() => {
+    if (pendingFocus === null || props.view === 'summary') return;
+    let target: HTMLElement | null | undefined;
+    if (pendingFocus.type === 'filter') target = filterRef.current;
+    if (pendingFocus.type === 'create') target = createButtonRef.current;
+    if (pendingFocus.type === 'folder') {
+      target = rootRef.current?.querySelector<HTMLElement>(
+        `[data-folder-name-index="${String(pendingFocus.index)}"]`,
+      );
+    }
+    if (pendingFocus.type === 'move') {
+      target = Array.from(
+        rootRef.current?.querySelectorAll<HTMLElement>('[data-skill-move]') ?? [],
+      ).find((element) => element.dataset.skillMove === pendingFocus.skill);
+    }
+    target?.focus();
+    setPendingFocus(null);
+  }, [pendingFocus, props.view]);
 
   if (props.view === 'summary') return t('page.summary');
   const disabled = !form.writable || form.saving;
 
   return (
     <SettingsForm labels={formLabels(t)} state={form} onSave={props.save} onDiscard={props.discard}>
-      <div style={pageStyle} data-skill-folder-page>
-        <div style={toolbarStyle}>
-          <button
-            type="button"
-            style={buttonStyle}
-            disabled={disabled}
-            onClick={() => {
-              props.addFolder('');
-            }}
-          >
-            {t('folder.create')}
-          </button>
-          <button
-            type="button"
-            style={buttonStyle}
-            disabled={disabled || skillsState.status !== 'ready'}
-            onClick={() => {
-              props.replaceFolders(
-                autoGroup(
-                  folders,
-                  skills.map((skill) => skill.name),
-                  (prefix) => t('autoGroup.description', { prefix }),
-                ),
-              );
-            }}
-          >
-            {t('autoGroup.label')}
-          </button>
-          <input
-            aria-label={t('filter.label')}
-            placeholder={t('filter.placeholder')}
-            style={{ ...inputStyle, flex: '1 1 160px' }}
-            value={filter}
-            onChange={(event) => {
-              setFilter(event.target.value);
-            }}
-          />
-          {form.dirty ? (
+      <div ref={rootRef} style={pageStyle} data-skill-folder-page>
+        <style data-skill-folder-focus-styles>{focusStyleText}</style>
+        <span style={srOnlyStyle} data-skill-folder-live role="status" aria-live="polite">
+          {announcement}
+        </span>
+        <header style={pageHeaderStyle}>
+          <h2 style={pageTitleStyle}>{t('page.title')}</h2>
+          <p style={pageDescriptionStyle}>{t('page.description')}</p>
+        </header>
+        <div style={toolbarStyle} data-skill-folder-toolbar>
+          <div style={toolbarActionsStyle}>
+            <button
+              ref={createButtonRef}
+              type="button"
+              style={primaryButtonStyle}
+              disabled={disabled}
+              onClick={() => {
+                props.addFolder('');
+                setPendingFocus({ type: 'folder', index: folders.length });
+              }}
+            >
+              {t('folder.create')}
+            </button>
             <button
               type="button"
               style={buttonStyle}
-              disabled={form.saving}
-              onClick={props.discard}
+              disabled={disabled || skillsState.status !== 'ready'}
+              onClick={() => {
+                props.replaceFolders(
+                  autoGroup(
+                    folders,
+                    skills.map((skill) => skill.name),
+                    (prefix) => t('autoGroup.description', { prefix }),
+                  ),
+                );
+              }}
             >
-              {t('page.discard')}
+              {t('autoGroup.label')}
             </button>
-          ) : null}
+            {form.dirty ? (
+              <button
+                type="button"
+                style={buttonStyle}
+                disabled={form.saving}
+                onClick={props.discard}
+              >
+                {t('page.discard')}
+              </button>
+            ) : null}
+          </div>
+          <div style={filterGroupStyle}>
+            <input
+              ref={filterRef}
+              type="search"
+              aria-label={t('filter.label')}
+              aria-describedby={`${id}-filter-count`}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={t('filter.placeholder')}
+              style={filterInputStyle}
+              value={filter}
+              onChange={(event) => {
+                setFilter(event.target.value);
+              }}
+            />
+            <span id={`${id}-filter-count`} style={badgeStyle} role="status" aria-live="polite">
+              {filterActive
+                ? t('filter.results', {
+                    visible: String(visibleCount),
+                    total: String(totalCount),
+                  })
+                : t('filter.total', { total: String(totalCount) })}
+            </span>
+            {filterActive ? (
+              <button
+                type="button"
+                style={buttonStyle}
+                onClick={() => {
+                  setFilter('');
+                  setPendingFocus({ type: 'filter' });
+                }}
+              >
+                {t('filter.clear')}
+              </button>
+            ) : null}
+          </div>
         </div>
+        <p style={hintStyle}>{t('autoGroup.hint')}</p>
 
-        {skillsState.status === 'loading' ? <p style={hintStyle}>{t('page.loading')}</p> : null}
+        {skillsState.status === 'loading' ? (
+          <p style={{ ...statusStyle, ...hintStyle }} role="status">
+            {t('page.loading')}
+          </p>
+        ) : null}
         {skillsState.status === 'error' ? (
           <p style={errorStyle} role="alert">
             {t('page.loadFailed', { message: skillsState.message })}{' '}
@@ -293,6 +455,9 @@ export function FolderPage(props: FolderPageProps) {
         {skillsState.status === 'ready' && !skillsState.complete ? (
           <p style={warnStyle} role="status">
             {t('page.incomplete')}
+            <button type="button" style={buttonStyle} onClick={retry}>
+              {t('page.retry')}
+            </button>
           </p>
         ) : null}
         {errors.length > 0 ? (
@@ -302,25 +467,40 @@ export function FolderPage(props: FolderPageProps) {
         ) : null}
 
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          {folders.map((folder, index) => (
-            <FolderCard
-              // 下标稳定：名称编辑时卡片不重建，输入框保持焦点
-              // biome-ignore lint/suspicious/noArrayIndexKey: 文件夹以下标定位
-              key={folderDropId(index)}
-              index={index}
-              folder={folder}
-              folderNames={folderNames}
-              descriptions={descriptions}
-              loaded={skillsState.status === 'ready'}
-              errors={errors.filter((error) => error.index === index)}
-              disabled={disabled}
-              t={t}
-              onRename={props.renameFolder}
-              onDescribe={props.describeFolder}
-              onRemove={props.removeFolder}
-              onMove={props.moveSkill}
-            />
-          ))}
+          <section style={folderSectionStyle} aria-label={t('page.folders')}>
+            <div style={sectionHeaderStyle}>
+              <h3 style={sectionTitleStyle}>{t('page.folders')}</h3>
+              <span style={badgeStyle}>{String(folders.length)}</span>
+            </div>
+            <div style={folderGridStyle} data-skill-folder-grid>
+              {folders.map((folder, index) => (
+                <FolderCard
+                  // 下标稳定：名称编辑时卡片不重建，输入框保持焦点
+                  key={folderDropId(index)}
+                  index={index}
+                  folder={folder}
+                  visibleSkills={visibleFolderSkills[index] ?? []}
+                  collapsed={effectiveFolderCollapsed(
+                    collapsed.has(index),
+                    filterActive,
+                    visibleFolderSkills[index]?.length ?? 0,
+                  )}
+                  filterActive={filterActive}
+                  folderNames={folderNames}
+                  descriptions={descriptions}
+                  loaded={skillsState.status === 'ready'}
+                  errors={errors.filter((error) => error.index === index)}
+                  disabled={disabled}
+                  t={t}
+                  onRename={props.renameFolder}
+                  onDescribe={props.describeFolder}
+                  onRemove={onRemoveFolder}
+                  onToggle={toggleCollapsed}
+                  onMove={onMoveSkill}
+                />
+              ))}
+            </div>
+          </section>
           <UngroupedArea
             names={ungrouped}
             descriptions={descriptions}
@@ -328,50 +508,52 @@ export function FolderPage(props: FolderPageProps) {
             disabled={disabled}
             emptyText={ungroupedEmptyText(skillsState.status, filter, t)}
             t={t}
-            onMove={props.moveSkill}
+            onMove={onMoveSkill}
           />
         </DndContext>
 
         <div style={{ ...dividerStyle, paddingTop: 12 }} data-skill-folder-options>
-          <h3 style={sectionTitleStyle}>{t('options.title')}</h3>
-          <SettingsValueField
-            id={`${id}-default-limit`}
-            label={t('options.defaultLimit')}
-            hint={t('options.defaultLimitHint')}
-            invalidLabel={t('options.defaultLimitHint')}
-            overriddenLabel={t('page.overridden')}
-            resetLabel={t('page.reset')}
-            text={form.defaultLimit.text}
-            overridden={form.defaultLimit.overridden}
-            invalid={form.defaultLimit.invalid}
-            disabled={disabled}
-            numeric
-            onEdit={(text) => {
-              props.edit('defaultLimit', text);
-            }}
-            onReset={() => {
-              props.resetField('defaultLimit');
-            }}
-          />
-          <SettingsValueField
-            id={`${id}-description-max`}
-            label={t('options.descriptionMaxLength')}
-            hint={t('options.descriptionMaxLengthHint')}
-            invalidLabel={t('options.descriptionMaxLengthHint')}
-            overriddenLabel={t('page.overridden')}
-            resetLabel={t('page.reset')}
-            text={form.descriptionMaxLength.text}
-            overridden={form.descriptionMaxLength.overridden}
-            invalid={form.descriptionMaxLength.invalid}
-            disabled={disabled}
-            numeric
-            onEdit={(text) => {
-              props.edit('descriptionMaxLength', text);
-            }}
-            onReset={() => {
-              props.resetField('descriptionMaxLength');
-            }}
-          />
+          <h3 style={{ ...sectionTitleStyle, marginBottom: 10 }}>{t('options.title')}</h3>
+          <div style={optionsGridStyle}>
+            <SettingsValueField
+              id={`${id}-default-limit`}
+              label={t('options.defaultLimit')}
+              hint={t('options.defaultLimitHint')}
+              invalidLabel={t('options.defaultLimitHint')}
+              overriddenLabel={t('page.overridden')}
+              resetLabel={t('page.reset')}
+              text={form.defaultLimit.text}
+              overridden={form.defaultLimit.overridden}
+              invalid={form.defaultLimit.invalid}
+              disabled={disabled}
+              numeric
+              onEdit={(text) => {
+                props.edit('defaultLimit', text);
+              }}
+              onReset={() => {
+                props.resetField('defaultLimit');
+              }}
+            />
+            <SettingsValueField
+              id={`${id}-description-max`}
+              label={t('options.descriptionMaxLength')}
+              hint={t('options.descriptionMaxLengthHint')}
+              invalidLabel={t('options.descriptionMaxLengthHint')}
+              overriddenLabel={t('page.overridden')}
+              resetLabel={t('page.reset')}
+              text={form.descriptionMaxLength.text}
+              overridden={form.descriptionMaxLength.overridden}
+              invalid={form.descriptionMaxLength.invalid}
+              disabled={disabled}
+              numeric
+              onEdit={(text) => {
+                props.edit('descriptionMaxLength', text);
+              }}
+              onReset={() => {
+                props.resetField('descriptionMaxLength');
+              }}
+            />
+          </div>
         </div>
       </div>
     </SettingsForm>

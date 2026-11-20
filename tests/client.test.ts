@@ -11,7 +11,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseSkillsPayload } from '../src/client/api.ts';
 import { autoGroup as autoGroupFolders } from '../src/client/auto-group.ts';
 import { type FolderFormState, ROW_ID, ROW_KEY } from '../src/client/folder-form.ts';
-import { FolderPage } from '../src/client/folder-page.tsx';
+import {
+  collapsedAfterRemoval,
+  effectiveFolderCollapsed,
+  FolderPage,
+  filterSkillNames,
+} from '../src/client/folder-page.tsx';
 import * as clientEntry from '../src/client/index.ts';
 import { en, NS, zh } from '../src/client/locales.ts';
 import { type ClientServiceName, makeClientCtx } from './helpers.ts';
@@ -186,6 +191,17 @@ describe('配置页渲染', () => {
     expect(html).toContain('保存');
   });
 
+  it('页面提供标题、用途说明、操作区与自适应文件夹网格', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('<h2');
+    expect(html).toContain('技能文件夹');
+    expect(html).toContain('按用途整理全局技能');
+    expect(html).toContain('data-skill-folder-toolbar');
+    expect(html).toContain('data-skill-folder-grid');
+    expect(html).toContain('grid-template-columns:repeat(auto-fit');
+    expect(html).toContain('data-skill-folder-focus-styles');
+  });
+
   it('page 渲染英文文案', () => {
     const html = renderPage('page', en);
     expect(html).toContain('New folder');
@@ -193,11 +209,21 @@ describe('配置页渲染', () => {
     expect(html).toContain('Save');
   });
 
+  it('文件夹提供带可访问名称与展开状态的折叠按钮', () => {
+    const html = renderPage('page', zh);
+    expect(html).toMatch(/<button[^>]*aria-label="折叠 lark"[^>]*aria-expanded="true"/);
+    expect(html).toContain('data-folder-members="lark"');
+    expect(html).toContain('共 1 个技能');
+  });
+
   it('成员带「移动到」下拉框，选项包含未分组与全部文件夹', () => {
     const html = renderPage('page', zh);
     expect(html).toMatch(/<select[^>]*aria-label="移动到 lark-doc"/);
     expect(html).toContain('<option value="">未分组</option>');
     expect(html).toContain('<option value="lark" selected="">lark</option>');
+    expect(html).toContain('data-skill-move="lark-doc"');
+    expect(html).toContain('data-skill-drag-handle="lark-doc"');
+    expect(html).toContain('aria-label="拖拽 lark-doc"');
   });
 
   it('文件夹名称为空时显示错误并标记输入框', () => {
@@ -215,7 +241,31 @@ describe('配置页渲染', () => {
     );
     expect(html).toContain('文件夹名称不能为空。');
     expect(html).toContain('aria-invalid="true"');
+    expect(html).toMatch(/aria-errormessage="[^"]+"/);
     expect(html).toContain('文件夹配置有误，修正后才能保存。');
+  });
+
+  it('筛选输入关联实时结果计数，并提供状态与焦点语义', () => {
+    const html = renderPage('page', zh);
+    expect(html).toMatch(/<input[^>]*aria-label="筛选技能"[^>]*aria-describedby="[^"]+"/);
+    expect(html).toMatch(/<span[^>]*id="[^"]+"[^>]*role="status"[^>]*aria-live="polite"/);
+    expect(html).toContain('role="status"');
+    expect(html).toContain('data-skill-folder-focus-styles');
+    expect(html).toContain(':focus-visible');
+  });
+
+  it('提供自动分组规则与移动操作的实时播报区域', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('先按文件夹名匹配');
+    expect(html).toContain('data-skill-folder-live');
+    expect(html).toContain('aria-live="polite"');
+  });
+
+  it('英文界面包含新增的页面、筛选与折叠文案', () => {
+    const html = renderPage('page', en);
+    expect(html).toContain('Organize global skills by purpose');
+    expect(html).toContain('1 skills');
+    expect(html).toContain('aria-label="Collapse lark"');
   });
 
   it('只读时禁用编辑控件与保存', () => {
@@ -267,6 +317,36 @@ describe('配置页渲染', () => {
   it('有未保存修改时显示放弃按钮', () => {
     expect(renderPage('page', zh, pageState({ dirty: true }))).toContain('放弃修改');
     expect(renderPage('page', zh)).not.toContain('放弃修改');
+  });
+});
+
+describe('配置页临时视图状态', () => {
+  it('筛选同时匹配名称与描述，并忽略大小写和首尾空白', () => {
+    const descriptions = new Map([
+      ['lark-doc', 'Manage documents'],
+      ['lark-sheet', 'Manage sheets'],
+      ['x-calendar', 'Calendar tools'],
+    ]);
+    expect(
+      filterSkillNames(['lark-doc', 'lark-sheet', 'x-calendar'], descriptions, ' LARK-DOC '),
+    ).toEqual(['lark-doc']);
+    expect(
+      filterSkillNames(['lark-doc', 'lark-sheet', 'x-calendar'], descriptions, 'sheets'),
+    ).toEqual(['lark-sheet']);
+    expect(filterSkillNames(['lark-doc'], descriptions, 'missing')).toEqual([]);
+  });
+
+  it('筛选激活时临时展开有匹配项的文件夹', () => {
+    expect(effectiveFolderCollapsed(true, true, 1)).toBe(false);
+    expect(effectiveFolderCollapsed(true, true, 0)).toBe(true);
+    expect(effectiveFolderCollapsed(true, false, 1)).toBe(true);
+    expect(effectiveFolderCollapsed(false, true, 1)).toBe(false);
+  });
+
+  it('删除文件夹后折叠下标跟随原文件夹移动', () => {
+    expect([...collapsedAfterRemoval(new Set([1, 3]), 1)]).toEqual([2]);
+    expect([...collapsedAfterRemoval(new Set([0, 2]), 0)]).toEqual([1]);
+    expect([...collapsedAfterRemoval(new Set([0, 1]), 3)]).toEqual([0, 1]);
   });
 });
 

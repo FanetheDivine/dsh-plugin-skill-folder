@@ -6,7 +6,14 @@
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import { useDraggable } from '@dnd-kit/core';
 import type { NS } from './locales.ts';
-import { chipNameStyle, chipStyle, missingChipStyle, selectStyle } from './styles.ts';
+import {
+  chipNameStyle,
+  chipStyle,
+  dragHandleStyle,
+  dragIconStyle,
+  missingChipStyle,
+  selectStyle,
+} from './styles.ts';
 
 /** 下拉框中「未分组」选项的值。 */
 const UNGROUPED_VALUE = '';
@@ -37,11 +44,12 @@ export interface SkillChipProps {
  * @returns 可拖拽的条目。
  */
 export function SkillChip(props: SkillChipProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: props.name,
-    disabled: props.disabled || props.missing === true,
-    data: { folder: props.folder },
-  });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
+    useDraggable({
+      id: props.name,
+      disabled: props.disabled || props.missing === true,
+      data: { folder: props.folder },
+    });
   const style = {
     ...(props.missing === true ? missingChipStyle : chipStyle),
     ...(transform === null
@@ -55,13 +63,25 @@ export function SkillChip(props: SkillChipProps) {
       style={style}
       title={props.missing === true ? props.t('folder.missing') : props.description}
       data-skill-chip={props.name}
-      {...listeners}
-      {...attributes}
     >
-      <span style={chipNameStyle}>{props.name}</span>
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        style={dragHandleStyle}
+        data-skill-drag-handle={props.name}
+        aria-label={props.t('skill.drag', { name: props.name })}
+        {...listeners}
+        {...attributes}
+      >
+        <span aria-hidden="true" style={dragIconStyle}>
+          ⠿
+        </span>
+        <span style={{ ...chipNameStyle, minWidth: 0 }}>{props.name}</span>
+      </button>
       <select
         aria-label={`${props.t('skill.move')} ${props.name}`}
-        style={selectStyle}
+        data-skill-move={props.name}
+        style={{ ...selectStyle, flexShrink: 0 }}
         value={props.folder ?? UNGROUPED_VALUE}
         disabled={props.disabled}
         // 下拉框交互时不触发拖拽
