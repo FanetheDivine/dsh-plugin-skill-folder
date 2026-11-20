@@ -54,6 +54,8 @@ export default defineConfig([
     target: 'es2024',
     dts: false,
     clean: false,
+    // 内联的 npm 依赖（如 @dnd-kit）按 NODE_ENV 选择产物；浏览器没有 process，构建时替换为常量
+    define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     deps: {
       // 平台种子不得内联；其余依赖（含 devDependencies）一律内联，
       // 宿主模块表里没有的 require 会在运行时直接抛错。

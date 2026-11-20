@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { PLUGIN_LABEL } from '../src/constants.ts';
 import { apply, inject, name } from '../src/index.ts';
-import { makeCtx, volatile } from './helpers.ts';
+import { volatile } from './helpers.ts';
 import { makePluginCtx } from './support/plugin-ctx.ts';
 
 describe('模块契约', () => {
@@ -15,10 +15,11 @@ describe('模块契约', () => {
 
 describe('apply 接线', () => {
   it('订阅 agent/pre-step 与 loader/volatile-update', () => {
-    const ctx = makeCtx();
-    apply(ctx, {});
-    expect(ctx._onCallbacks.has('agent/pre-step')).toBe(true);
-    expect(ctx._onCallbacks.has('loader/volatile-update')).toBe(true);
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    const events = ctx._listeners.map((entry) => entry.event);
+    expect(events).toContain('agent/pre-step');
+    expect(events).toContain('loader/volatile-update');
   });
 
   it('pre-step 监听以 prepend 注册，位于原生监听之外', () => {
@@ -180,5 +181,57 @@ describe('配置热更新', () => {
     }))) as { messages: readonly unknown[] };
     // 保持原状：旧配置没有折叠任何成员
     expect(result.messages[0]).toBe(ctx.catalog);
+  });
+});
+
+describe('全局技能路由', () => {
+  it('注册 GET /api/skill-folder/skills', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    expect(ctx._routes.map((route) => [route.path, route.methods])).toEqual([
+      ['/api/skill-folder/skills', ['GET']],
+    ]);
+  });
+
+  it('返回按名称排序的全局技能与完整性', async () => {
+    const ctx = makePluginCtx({ complete: false });
+    apply(ctx as never, {});
+    const response = await ctx._routes[0]?.fetch(new Request('http://x/api/skill-folder/skills'));
+    expect(response?.status).toBe(200);
+    const body = (await response?.json()) as { complete: boolean; skills: { name: string }[] };
+    expect(body.complete).toBe(false);
+    expect(body.skills.map((skill) => skill.name)).toEqual([
+      'chrome-devtools',
+      'lark-doc',
+      'lark-sheet',
+    ]);
+  });
+
+  it('路由读取全局集合：不传工作区与作用域', async () => {
+    const ctx = makePluginCtx();
+    const seen: Record<string, unknown>[] = [];
+    ctx.snapshot = async (input) => {
+      seen.push(input);
+      return { skills: ctx.skillsFixture, complete: true };
+    };
+    apply(ctx as never, {});
+    await ctx._routes[0]?.fetch(new Request('http://x/api/skill-folder/skills'));
+    expect(seen).toEqual([{}]);
+  });
+
+  it('读取失败时返回 500 与错误', async () => {
+    const ctx = makePluginCtx();
+    ctx.snapshot = undefined;
+    apply(ctx as never, {});
+    const response = await ctx._routes[0]?.fetch(new Request('http://x/api/skill-folder/skills'));
+    if (response === undefined) throw new Error('路由没有返回响应');
+    expect(response.status).toBe(500);
+    expect(((await response.json()) as { error: string }).error).toContain('没有技能快照');
+  });
+
+  it('connection 不可用时不注册路由', () => {
+    const ctx = makePluginCtx({ connection: false });
+    apply(ctx as never, {});
+    expect(ctx._routes).toEqual([]);
   });
 });

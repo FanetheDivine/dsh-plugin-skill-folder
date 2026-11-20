@@ -4,6 +4,7 @@
 import { foldCatalog, type SkillCatalogMessage } from './catalog.ts';
 import { type PluginConfig, readConfig } from './config.ts';
 import { PLUGIN_LABEL, TOOL_NAME } from './constants.ts';
+import { type RouteHost, registerSkillsRoute } from './routes.ts';
 import { buildSearchTool } from './search-tool.ts';
 import type { SkillSummary } from './skills.ts';
 import type { Context } from './types.ts';
@@ -100,6 +101,15 @@ export function apply(ctx: Context, config?: unknown): void {
     },
     `${PLUGIN_LABEL}: search tool`,
   );
+
+  // 配置页读取全局技能：不传工作区与作用域，只得到全局集合
+  registerSkillsRoute(ctx as unknown as RouteHost, {
+    snapshot: async () => {
+      const snapshot = await services.skills?.snapshot({});
+      if (snapshot === undefined) throw new Error(`${PLUGIN_LABEL}: skills service unavailable`);
+      return snapshot;
+    },
+  });
 
   ctx.effect(
     () =>

@@ -1,0 +1,252 @@
+// 前端入口接线测试：服务分组、字典键集、配置页注册参数与中英文渲染。
+import type {} from '@deepseek-ai/dsh-client-locale/client';
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
+
+import { parseSkillsPayload } from '../src/client/api.ts';
+import { type FolderFormState, ROW_ID, ROW_KEY } from '../src/client/folder-form.ts';
+import { FolderPage } from '../src/client/folder-page.tsx';
+import * as clientEntry from '../src/client/index.ts';
+import { en, NS, zh } from '../src/client/locales.ts';
+import { type ClientServiceName, makeClientCtx } from './helpers.ts';
+
+const { apply } = clientEntry;
+const ALL_SERVICES: ClientServiceName[] = ['slots', 'locale', 'configForms'];
+
+/** 用字典与 `{name}` 模板参数构造翻译函数，行为与宿主 locale 座一致。 */
+function translate(dict: Record<string, string>): TranslateNS<typeof NS> {
+  return (key, params) =>
+    (dict[key] ?? key).replace(/\{(\w+)\}/g, (_match, name: string) =>
+      String(params?.[name] ?? ''),
+    );
+}
+
+/** 配置页的草稿状态。 */
+function pageState(overrides: Partial<FolderFormState> = {}): FolderFormState {
+  return {
+    available: true,
+    writable: true,
+    dirty: false,
+    invalid: false,
+    saving: false,
+    failed: false,
+    folders: {
+      text: JSON.stringify([{ name: 'lark', description: '飞书', skills: ['lark-doc'] }]),
+      overridden: true,
+      invalid: false,
+    },
+    defaultLimit: { text: '5', overridden: false, invalid: false },
+    descriptionMaxLength: { text: '320', overridden: false, invalid: false },
+    ...overrides,
+  };
+}
+
+/** 渲染配置页：用假的选择器 Hook 返回给定状态。 */
+function renderPage(
+  view: 'page' | 'summary',
+  dict: Record<string, string>,
+  state = pageState(),
+): string {
+  const props = {
+    view,
+    t: translate(dict),
+    useConfigForm: <S>(select: (value: FolderFormState) => S): S => select(state),
+    edit: vi.fn(),
+    resetField: vi.fn(),
+    save: vi.fn(),
+    discard: vi.fn(),
+    addFolder: vi.fn(),
+    renameFolder: vi.fn(),
+    describeFolder: vi.fn(),
+    removeFolder: vi.fn(),
+    moveSkill: vi.fn(),
+    replaceFolders: vi.fn(),
+    loadSkills: () => new Promise(() => undefined),
+  };
+  return renderToStaticMarkup(createElement(FolderPage, props as never));
+}
+
+describe('前端入口', () => {
+  it('不声明必需服务，按功能分组等待各自用到的服务', () => {
+    expect('inject' in clientEntry).toBe(false);
+    const ctx = makeClientCtx();
+    apply(ctx);
+    expect(ctx._injectGroups).toEqual([['locale'], ['slots', 'locale', 'configForms']]);
+  });
+
+  it('注册双语字典与插件行配置页', () => {
+    const ctx = makeClientCtx();
+    apply(ctx);
+    expect(ctx._localeRegistrations.map((entry) => entry.ns)).toEqual([NS]);
+    expect(Object.keys(ctx._localeRegistrations[0]?.dicts ?? {}).sort()).toEqual(['en', 'zh']);
+    expect(ctx._slotInjections).toEqual(['plugins.row.config']);
+    expect(ctx._slotRegistrations[0]?.options).toMatchObject({
+      name: 'plugins.row.config',
+      key: ROW_KEY,
+      locale: NS,
+    });
+    expect(ctx._slotRegistrations[0]?.component).toBe(FolderPage);
+    expect(ctx._configFormRequests).toEqual([ROW_ID]);
+    expect(ROW_KEY).toBe('dsh-plugin-skill-folder#dsh-plugin-skill-folder');
+  });
+
+  it('注入值包含表单动作与技能读取', () => {
+    const ctx = makeClientCtx();
+    apply(ctx);
+    const inject = ctx._slotRegistrations[0]?.options['inject'] as () => Record<string, unknown>;
+    const injected = inject();
+    for (const key of [
+      'save',
+      'discard',
+      'edit',
+      'resetField',
+      'addFolder',
+      'moveSkill',
+      'loadSkills',
+    ]) {
+      expect(typeof injected[key]).toBe('function');
+    }
+  });
+
+  it('卸载时释放配置表单的订阅', () => {
+    const ctx = makeClientCtx();
+    apply(ctx);
+    const scope = ctx._configFormScopes[0];
+    expect(scope?.subscriberCount()).toBe(1);
+    ctx._dispose();
+    expect(scope?.subscriberCount()).toBe(0);
+  });
+});
+
+describe('前端服务可选', () => {
+  /** 三个服务各有或无的全部 8 种组合。 */
+  const combinations: ClientServiceName[][] = Array.from({ length: 8 }, (_, mask) =>
+    ALL_SERVICES.filter((_name, index) => (mask >> index) & 1),
+  );
+
+  it.each(combinations.map((services) => [services]))('服务 %j 可用时启用成功', (services) => {
+    const ctx = makeClientCtx({ services });
+    expect(() => apply(ctx)).not.toThrow();
+    const configPage = ALL_SERVICES.every((name) => services.includes(name));
+    expect(ctx._activeSlots.size).toBe(configPage ? 1 : 0);
+    expect(ctx._activeLocales.size).toBe(services.includes('locale') ? 1 : 0);
+  });
+
+  it('configForms 晚就绪后配置页自动注册', () => {
+    const ctx = makeClientCtx({ services: ['slots', 'locale'] });
+    apply(ctx);
+    expect(ctx._activeSlots.size).toBe(0);
+    ctx._grant('configForms');
+    expect(ctx._activeSlots.size).toBe(1);
+  });
+
+  it('服务撤掉后清理配置页并释放订阅', () => {
+    const ctx = makeClientCtx();
+    apply(ctx);
+    ctx._revoke('configForms');
+    expect(ctx._activeSlots.size).toBe(0);
+    expect(ctx._configFormScopes[0]?.subscriberCount()).toBe(0);
+  });
+});
+
+describe('字典', () => {
+  it('中英字典键集一致且无空文案', () => {
+    expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort());
+    expect(Object.values(zh).every((text) => text.trim() !== '')).toBe(true);
+    expect(Object.values(en).every((text) => text.trim() !== '')).toBe(true);
+  });
+});
+
+describe('配置页渲染', () => {
+  it('summary 渲染一行描述', () => {
+    expect(renderPage('summary', zh)).toContain('把全局技能归入文件夹');
+    expect(renderPage('summary', en)).toContain('Group global skills into folders');
+  });
+
+  it('page 渲染工具栏、文件夹卡片与未分组区域', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('data-skill-folder-page');
+    expect(html).toContain('新建文件夹');
+    expect(html).toContain('data-folder-card="lark"');
+    expect(html).toContain('value="lark"');
+    expect(html).toContain('value="飞书"');
+    expect(html).toContain('data-skill-chip="lark-doc"');
+    expect(html).toContain('data-ungrouped');
+    expect(html).toContain('未分组的技能');
+    expect(html).toContain('正在读取技能…');
+    expect(html).toContain('保存');
+  });
+
+  it('page 渲染英文文案', () => {
+    const html = renderPage('page', en);
+    expect(html).toContain('New folder');
+    expect(html).toContain('Ungrouped skills');
+    expect(html).toContain('Save');
+  });
+
+  it('成员带「移动到」下拉框，选项包含未分组与全部文件夹', () => {
+    const html = renderPage('page', zh);
+    expect(html).toMatch(/<select[^>]*aria-label="移动到 lark-doc"/);
+    expect(html).toContain('<option value="">未分组</option>');
+    expect(html).toContain('<option value="lark" selected="">lark</option>');
+  });
+
+  it('文件夹名称为空时显示错误并标记输入框', () => {
+    const html = renderPage(
+      'page',
+      zh,
+      pageState({
+        invalid: true,
+        folders: {
+          text: JSON.stringify([{ name: '', description: '', skills: [] }]),
+          overridden: true,
+          invalid: true,
+        },
+      }),
+    );
+    expect(html).toContain('文件夹名称不能为空。');
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain('文件夹配置有误，修正后才能保存。');
+  });
+
+  it('只读时禁用编辑控件', () => {
+    const html = renderPage('page', zh, pageState({ writable: false }));
+    expect(html).toContain('此部署以只读方式保存设置。');
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>新建文件夹/);
+    expect(html).toMatch(/<input[^>]*aria-label="文件夹名称"[^>]*disabled/);
+  });
+
+  it('命名空间未下发时显示不可用文案', () => {
+    expect(renderPage('page', zh, pageState({ available: false }))).toContain(
+      '技能文件夹配置不可用。',
+    );
+  });
+
+  it('有未保存修改时显示放弃按钮', () => {
+    expect(renderPage('page', zh, pageState({ dirty: true }))).toContain('放弃修改');
+    expect(renderPage('page', zh)).not.toContain('放弃修改');
+  });
+});
+
+describe('技能列表响应', () => {
+  it('解析路由返回的条目与完整性', () => {
+    expect(
+      parseSkillsPayload({
+        complete: false,
+        skills: [{ name: 'a', description: 'A', source: 'user-agents' }, { bogus: true }],
+      }),
+    ).toEqual({
+      complete: false,
+      skills: [{ name: 'a', description: 'A', source: 'user-agents' }],
+    });
+  });
+
+  it('结构不符时报错', () => {
+    expect(() => parseSkillsPayload({ nope: 1 })).toThrow('unexpected skills response');
+  });
+});

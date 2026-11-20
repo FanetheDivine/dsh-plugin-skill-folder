@@ -40,6 +40,18 @@ export interface PluginCtxOptions {
   complete?: boolean;
   /** 会话工作目录。 */
   cwd?: string;
+  /** `connection` 服务是否可用，默认可用。 */
+  connection?: boolean;
+}
+
+/** 一条注册的 Fetch 路由。 */
+export interface RouteStub {
+  /** 路径。 */
+  path: string;
+  /** 允许的方法。 */
+  methods: readonly string[];
+  /** 处理函数。 */
+  fetch: (request: Request) => Promise<Response>;
 }
 
 /** 构造一个全局技能摘要。 */
@@ -84,6 +96,7 @@ export function makePluginCtx(options: PluginCtxOptions = {}) {
   const registeredTools: ToolStub[] = [];
   const activeTools = new Set<ToolStub>();
   const effectDisposers: Array<() => void> = [];
+  const routes: RouteStub[] = [];
   const catalog = catalogMessage(skills);
 
   /** 按名称读取已注册的工具。 */
@@ -104,9 +117,20 @@ export function makePluginCtx(options: PluginCtxOptions = {}) {
       listeners.push({ event, fn, options: opts });
       return () => undefined;
     },
-    inject(_deps: string[], callback: (child: unknown) => unknown) {
+    inject(deps: string[], callback: (child: unknown) => unknown) {
+      if (deps.includes('connection') && options.connection === false) return () => undefined;
       callback(ctx);
       return () => undefined;
+    },
+    connection: {
+      fetch: {
+        register: (route: RouteStub) => {
+          routes.push(route);
+          return async () => {
+            routes.splice(routes.indexOf(route), 1);
+          };
+        },
+      },
     },
     tools: {
       // 注册不改变本 Agent 的可见性：只有宿主报告的工具名才可见
@@ -148,6 +172,7 @@ export function makePluginCtx(options: PluginCtxOptions = {}) {
     _loggerCalls: loggerCalls,
     _listeners: listeners,
     _registeredTools: registeredTools,
+    _routes: routes,
     _activeTools: activeTools,
     /** 读取某事件的注册选项。 */
     _onOptions: (event: string) => listeners.find((entry) => entry.event === event)?.options,
