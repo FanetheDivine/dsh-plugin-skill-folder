@@ -15,6 +15,14 @@
     "skills",
     "folder"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FanetheDivine/dsh-plugin-skill-folder.git"
+  },
+  "homepage": "https://github.com/FanetheDivine/dsh-plugin-skill-folder#readme",
+  "bugs": {
+    "url": "https://github.com/FanetheDivine/dsh-plugin-skill-folder/issues"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
