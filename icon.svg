@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <title>dsh-plugin-skill-folder</title>
+  <defs>
+    <linearGradient id="skill-folder-back" x1="7" y1="8" x2="29" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#69B9FF"/>
+      <stop offset="1" stop-color="#324DE2"/>
+    </linearGradient>
+    <linearGradient id="skill-folder-card" x1="15" y1="6.5" x2="25" y2="18.5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#45E7A4"/>
+      <stop offset="1" stop-color="#05909D"/>
+    </linearGradient>
+    <linearGradient id="skill-folder-front" x1="7" y1="17" x2="29" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8CCBFF"/>
+      <stop offset="1" stop-color="#4766EA"/>
+    </linearGradient>
+  </defs>
+  <path d="M7 10.5A2.5 2.5 0 0 1 9.5 8h5.2l2.4 2.6h9.4A2.5 2.5 0 0 1 29 13.1V25.5A2.5 2.5 0 0 1 26.5 28h-17A2.5 2.5 0 0 1 7 25.5Z" fill="url(#skill-folder-back)"/>
+  <rect x="10.5" y="8.5" width="10" height="11" rx="1.6" fill="#0FB7A8" opacity="0.7" transform="rotate(-9 15.5 14)"/>
+  <rect x="15" y="6.5" width="10" height="12" rx="1.6" fill="url(#skill-folder-card)" transform="rotate(7 20 12.5)"/>
+  <path d="M7 18.5A2 2 0 0 1 9 16.5h18A2 2 0 0 1 29 18.5v7A2.5 2.5 0 0 1 26.5 28h-17A2.5 2.5 0 0 1 7 25.5Z" fill="url(#skill-folder-front)"/>
+</svg>

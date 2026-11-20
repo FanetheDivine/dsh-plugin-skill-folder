@@ -19,6 +19,12 @@ import {
 } from '../src/client/folder-page.tsx';
 import * as clientEntry from '../src/client/index.ts';
 import { en, NS, zh } from '../src/client/locales.ts';
+import {
+  moveMenuEntries,
+  moveSelectedId,
+  moveTargetOf,
+  UNGROUPED_ID,
+} from '../src/client/skill-chip.tsx';
 import { type ClientServiceName, makeClientCtx } from './helpers.ts';
 
 const { apply } = clientEntry;
@@ -74,7 +80,13 @@ function renderPage(
     replaceFolders: vi.fn(),
     loadSkills: () => new Promise(() => undefined),
   };
-  return renderToStaticMarkup(createElement(FolderPage, props as never));
+  // 宿主 Menu 渲染时读取 document.activeElement；静态渲染只需这一项
+  vi.stubGlobal('document', { activeElement: null });
+  try {
+    return renderToStaticMarkup(createElement(FolderPage, props as never));
+  } finally {
+    vi.unstubAllGlobals();
+  }
 }
 
 describe('前端入口', () => {
@@ -216,12 +228,13 @@ describe('配置页渲染', () => {
     expect(html).toContain('共 1 个技能');
   });
 
-  it('成员带「移动到」下拉框，选项包含未分组与全部文件夹', () => {
+  it('成员带「移动到」菜单按钮，显示当前分组', () => {
     const html = renderPage('page', zh);
-    expect(html).toMatch(/<select[^>]*aria-label="移动到 lark-doc"/);
-    expect(html).toContain('<option value="">未分组</option>');
-    expect(html).toContain('<option value="lark" selected="">lark</option>');
-    expect(html).toContain('data-skill-move="lark-doc"');
+    expect(html).toMatch(
+      /<button[^>]*aria-label="移动到 lark-doc"[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"/,
+    );
+    expect(html).toMatch(/data-skill-move="lark-doc"[^>]*>.*?lark<\/span>/);
+    expect(html).not.toContain('<select');
     expect(html).toContain('data-skill-drag-handle="lark-doc"');
     expect(html).toContain('aria-label="拖拽 lark-doc"');
   });
@@ -317,6 +330,54 @@ describe('配置页渲染', () => {
   it('有未保存修改时显示放弃按钮', () => {
     expect(renderPage('page', zh, pageState({ dirty: true }))).toContain('放弃修改');
     expect(renderPage('page', zh)).not.toContain('放弃修改');
+  });
+});
+
+describe('「移动到」菜单项', () => {
+  const folders = ['lark', 'ui-check'];
+
+  it('列出标题、未分组、分隔线与全部文件夹', () => {
+    const entries = moveMenuEntries(folders, translate(zh));
+    expect(entries.map((entry) => ('type' in entry ? entry.type : entry.label))).toEqual([
+      'label',
+      '未分组',
+      'separator',
+      'lark',
+      'ui-check',
+    ]);
+  });
+
+  it('没有文件夹时只列未分组，不画分隔线', () => {
+    const entries = moveMenuEntries([], translate(en));
+    expect(entries.map((entry) => ('type' in entry ? entry.type : entry.label))).toEqual([
+      'label',
+      'Ungrouped',
+    ]);
+  });
+
+  it('空名称文件夹显示占位名，id 仍可还原为原文件夹', () => {
+    const entries = moveMenuEntries(['', 'lark'], translate(zh));
+    const untitled = entries.find((entry) => !('type' in entry) && entry.label === '未命名文件夹');
+    expect(untitled).toBeDefined();
+    expect(moveTargetOf(String(untitled?.id), ['', 'lark'])).toBe('');
+  });
+
+  it('选中项与当前归属一一对应', () => {
+    const entries = moveMenuEntries(folders, translate(zh));
+    for (const target of [null, 'lark', 'ui-check']) {
+      const id = moveSelectedId(target, folders);
+      expect(entries.some((entry) => entry.id === id)).toBe(true);
+      expect(moveTargetOf(id, folders)).toBe(target);
+    }
+    expect(moveSelectedId('gone', folders)).toBe(UNGROUPED_ID);
+    expect(moveTargetOf('move-label', folders)).toBeUndefined();
+  });
+
+  it('文件夹名与保留 id 同名时不冲突', () => {
+    const tricky = ['ungrouped', 'folder:0'];
+    expect(moveTargetOf(moveSelectedId('ungrouped', tricky), tricky)).toBe('ungrouped');
+    expect(moveTargetOf(moveSelectedId('folder:0', tricky), tricky)).toBe('folder:0');
+    expect(moveTargetOf(moveSelectedId(null, tricky), tricky)).toBeNull();
   });
 });
 

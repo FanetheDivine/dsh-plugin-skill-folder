@@ -46,6 +46,7 @@ const LABELS = {
   ungrouped: ['未分组的技能', 'Ungrouped skills'],
   defaultLimit: ['默认返回数量', 'Default result count'],
   descriptionMaxLength: ['摘要长度上限', 'Summary length limit'],
+  moveToUngrouped: ['未分组', 'Ungrouped'],
 };
 
 const results = [];
@@ -154,7 +155,16 @@ try {
     const enabled = (await toggle.first().getAttribute('aria-checked')) === 'true';
     await page.screenshot({ path: join(shots, 'c1-plugins.png'), fullPage: true });
     if (!enabled) throw new Error(`${PLUGIN} 的启用开关为关闭状态`);
-    return { plugin: PLUGIN, listed: true, enabled };
+    // 插件导出 ./icon 时，卡片显示解码成功的图标图片
+    const icons = await card
+      .locator('img')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => ({ src: node.getAttribute('src') ?? '', width: node.naturalWidth })),
+      );
+    const icon = icons.find((entry) => entry.width > 0);
+    if (icon === undefined)
+      throw new Error(`${PLUGIN} 卡片没有可显示的图标：${JSON.stringify(icons)}`);
+    return { plugin: PLUGIN, listed: true, enabled, icon: icon.src.slice(0, 80) };
   });
 
   await check('C2 配置页：渲染技能文件夹设置', async () => {
@@ -237,6 +247,79 @@ try {
     const first = await chips.first().getAttribute('data-skill-chip');
     await page.screenshot({ path: join(shots, 'c5-chips.png'), fullPage: true });
     return { chips: count, first };
+  });
+
+  /** C3 新建的文件夹名与 C6 移动的技能名，C7 沿用。 */
+  const moved = { folder: '', skill: '' };
+
+  await check('C6 「移动到」菜单：键盘把技能移入文件夹', async () => {
+    moved.folder =
+      (await page.locator('[data-folder-card]').first().getAttribute('data-folder-card')) ?? '';
+    moved.skill =
+      (await page
+        .locator('[data-ungrouped] [data-skill-chip]')
+        .first()
+        .getAttribute('data-skill-chip')) ?? '';
+    if (moved.folder === '' || moved.skill === '') throw new Error('缺少文件夹或未分组技能');
+    const trigger = page.locator(`[data-skill-move="${moved.skill}"]`);
+    if ((await trigger.evaluate((node) => node.tagName)) !== 'BUTTON') {
+      throw new Error('「移动到」控件不是菜单按钮');
+    }
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    const menu = page.getByRole('menu');
+    await menu.waitFor({ state: 'visible', timeout: 5000 });
+    const items = await menu.getByRole('menuitem').allInnerTexts();
+    if (!items.some((text) => LABELS.moveToUngrouped.includes(text.trim()))) {
+      throw new Error(`菜单缺少未分组项：${JSON.stringify(items)}`);
+    }
+    if (!items.some((text) => text.trim() === moved.folder)) {
+      throw new Error(`菜单缺少文件夹 ${moved.folder}：${JSON.stringify(items)}`);
+    }
+    await page.screenshot({ path: join(shots, 'c6-menu.png') });
+    // 只用方向键走到目标文件夹，再用 Enter 确认
+    for (let step = 0; step < items.length; step += 1) {
+      const focused = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+      if (focused === moved.folder) break;
+      await page.keyboard.press('ArrowDown');
+    }
+    await page.keyboard.press('Enter');
+    await menu.waitFor({ state: 'hidden', timeout: 5000 });
+    await page
+      .locator(`[data-folder-card="${moved.folder}"] [data-skill-chip="${moved.skill}"]`)
+      .waitFor({ state: 'visible', timeout: 5000 });
+    const label = (await trigger.innerText()).trim();
+    if (label !== moved.folder) throw new Error(`触发按钮显示 ${label}，期望 ${moved.folder}`);
+    return { ...moved, items };
+  });
+
+  await check('C7 「移动到」菜单：Esc 关闭，鼠标移回未分组', async () => {
+    const trigger = page.locator(`[data-skill-move="${moved.skill}"]`);
+    const menu = page.getByRole('menu');
+    await trigger.click();
+    await menu.waitFor({ state: 'visible', timeout: 5000 });
+    const selected = await menu
+      .locator('[aria-checked="true"], [aria-current="true"], [aria-selected="true"]')
+      .allInnerTexts();
+    await page.keyboard.press('Escape');
+    await menu.waitFor({ state: 'hidden', timeout: 5000 });
+    await page
+      .locator(`[data-folder-card="${moved.folder}"] [data-skill-chip="${moved.skill}"]`)
+      .waitFor({ state: 'visible', timeout: 5000 });
+    await trigger.click();
+    await menu.waitFor({ state: 'visible', timeout: 5000 });
+    for (const name of LABELS.moveToUngrouped) {
+      const item = menu.getByRole('menuitem', { name, exact: true });
+      if (await item.count()) {
+        await item.first().click();
+        break;
+      }
+    }
+    await menu.waitFor({ state: 'hidden', timeout: 5000 });
+    await page
+      .locator(`[data-ungrouped] [data-skill-chip="${moved.skill}"]`)
+      .waitFor({ state: 'visible', timeout: 5000 });
+    return { skill: moved.skill, selected };
   });
 } catch (e) {
   console.error(e);

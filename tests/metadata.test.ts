@@ -84,3 +84,44 @@ describe('插件元数据资源', () => {
     expect(manifest['files']).toContain('locale/*.json');
   });
 });
+
+describe('插件图标', () => {
+  /** 宿主接受的图标体积上限。 */
+  const ICON_MAX_BYTES = 256 * 1024;
+
+  /** 读取 package.json 的 `./icon` 导出指向的文件。 */
+  function readIcon(): { file: string; text: string } {
+    const manifest = asRecord(JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')));
+    const file = asRecord(manifest['exports'])['./icon'];
+    expect(typeof file).toBe('string');
+    expect(manifest['files']).toContain(String(file).replace(/^\.\//, ''));
+    return { file: String(file), text: readFileSync(path.join(ROOT, String(file)), 'utf8') };
+  }
+
+  it('package.json 导出并打包包内 SVG 图标', () => {
+    const { file, text } = readIcon();
+    expect(file).toMatch(/^\.\/[^/]+\.svg$/);
+    expect(Buffer.byteLength(text)).toBeLessThan(ICON_MAX_BYTES);
+  });
+
+  it('图标为 36×36 的自包含 SVG', () => {
+    const { text } = readIcon();
+    expect(text.trimStart().startsWith('<svg')).toBe(true);
+    expect(text).toContain('viewBox="0 0 36 36"');
+    for (const tag of ['<text', '<style', '<script', '<image', '<foreignObject']) {
+      expect(text.includes(tag)).toBe(false);
+    }
+    expect(text).not.toMatch(/\son[a-z]+=/i);
+    expect(text).not.toMatch(/href="(?!#)/);
+  });
+
+  it('图标引用的渐变都在文件内定义', () => {
+    const { text } = readIcon();
+    const defined = new Set([...text.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]));
+    const referenced = [...text.matchAll(/url\(#([^)]+)\)/g)].map((match) => match[1]);
+    expect(referenced.length).toBeGreaterThan(0);
+    for (const id of referenced) {
+      expect(defined.has(id)).toBe(true);
+    }
+  });
+});
