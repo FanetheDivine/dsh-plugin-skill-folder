@@ -20,8 +20,8 @@
 
 **Purpose**: 建立各故事共用的主题样式与双语文案
 
-- [ ] T002 在 `src/client/styles.ts` 建立页面、操作区、响应式网格、状态 badge、控件焦点和选项网格样式，仅使用 `--dsw-alias-*` 令牌
-- [ ] T003 在 `src/client/locales.ts` 添加页面说明、筛选计数与清除、折叠、空状态和区域标题的中英文案
+- [x] T002 在 `src/client/styles.ts` 建立页面、操作区、响应式网格、状态 badge、控件焦点和选项网格样式，仅使用 `--dsw-alias-*` 令牌
+- [x] T003 在 `src/client/locales.ts` 添加页面说明、筛选计数与清除、折叠、空状态和区域标题的中英文案
 
 **Checkpoint**: 共用样式和完整字典可供所有故事使用
 
