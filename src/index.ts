@@ -1,8 +1,9 @@
 /**
  * 插件入口。导出宿主约定的 name、inject、apply 与 Config。
  */
+import { autoGroup, sameFolders } from './auto-group.ts';
 import { foldCatalog, type SkillCatalogMessage } from './catalog.ts';
-import { type PluginConfig, readConfig } from './config.ts';
+import { type FolderConfig, type PluginConfig, readConfig } from './config.ts';
 import { PLUGIN_LABEL, TOOL_NAME } from './constants.ts';
 import { type RouteHost, registerSkillsRoute } from './routes.ts';
 import { buildSearchTool } from './search-tool.ts';
@@ -45,6 +46,30 @@ interface WorkingDirectoryService {
 interface AgentPresetsService {
   /** 取得默认 preset 的作用域租约；不传 id 时用注册表的默认 preset。 */
   acquireScope: (id?: string) => Promise<{ readonly key: object }>;
+}
+
+/** 宿主 `configEditor` 服务的最小面。 */
+interface ConfigEditorService {
+  /** 校验并写入插件配置；`change` 返回下一份完整配置。 */
+  edit: (
+    entry: object,
+    change: (
+      current: Record<string, unknown>,
+      inherited: Record<string, unknown>,
+    ) => Record<string, unknown>,
+  ) => Promise<void>;
+}
+
+/** 当前 Fiber 的配置条目。 */
+interface FiberCarrier {
+  /** 插件在 profile 中的装载条目。 */
+  fiber?: { entry?: object } | undefined;
+}
+
+/** `skills/change` 监听面。事件由宿主 `@deepseek-ai/dsh-skill` 声明。 */
+interface SkillsChangeSource {
+  /** 注册监听，返回注销函数。 */
+  on: (event: 'skills/change', listener: () => unknown) => () => boolean;
 }
 
 /** 一次技能快照读取。 */
@@ -153,6 +178,60 @@ export function apply(ctx: Context, config?: unknown): void {
   // 配置页读取全局技能：按默认 preset 的作用域读取
   registerSkillsRoute(ctx as unknown as RouteHost, { snapshot: readGlobalSnapshot });
 
+  /** 读取全局技能名。 */
+  const readGlobalSkillNames = async (): Promise<string[]> => {
+    const snapshot = await readGlobalSnapshot();
+    return snapshot.skills.map((skill) => skill.name);
+  };
+
+  /** 按当前全局技能重算文件夹；结果与现有配置一致时返回 undefined。 */
+  const planAutoGroup = async (): Promise<FolderConfig[] | undefined> => {
+    const next = autoGroup(current.folders, await readGlobalSkillNames(), () => '');
+    return sameFolders(next, current.folders) ? undefined : next;
+  };
+
+  /** 写回文件夹；缺少配置编辑能力时只记录警告。 */
+  const writeFolders = async (folders: FolderConfig[]): Promise<void> => {
+    const editor = services.get?.('configEditor') as ConfigEditorService | undefined;
+    const entry = (ctx as unknown as FiberCarrier).fiber?.entry;
+    if (editor === undefined || entry === undefined) {
+      services.logger.warn?.(`[${PLUGIN_LABEL}] auto group skipped: config editor unavailable`);
+      return;
+    }
+    await editor.edit(entry, (raw) => ({ ...raw, folders }));
+    current = { ...current, folders };
+  };
+
+  let grouping = false;
+  let regroupPending = false;
+
+  /** 执行一次自动分组；多次触发串行，期间的触发合并为下一次。 */
+  const runAutoGroup = async (): Promise<void> => {
+    if (!current.alwaysGroup) return;
+    if (grouping) {
+      regroupPending = true;
+      return;
+    }
+    grouping = true;
+    try {
+      const next = await planAutoGroup();
+      if (next !== undefined) await writeFolders(next);
+    } catch (error) {
+      services.logger.warn?.(`[${PLUGIN_LABEL}] auto group skipped: ${String(error)}`);
+    } finally {
+      grouping = false;
+      if (regroupPending) {
+        regroupPending = false;
+        void runAutoGroup();
+      }
+    }
+  };
+
+  ctx.effect(
+    () => (ctx as unknown as SkillsChangeSource).on('skills/change', () => runAutoGroup()),
+    `${PLUGIN_LABEL}: always group`,
+  );
+
   ctx.effect(
     () =>
       ctx.on(
@@ -188,6 +267,7 @@ export function apply(ctx: Context, config?: unknown): void {
 
   // 热重载：读取失败时保持当前状态
   ctx.on('loader/volatile-update', () => {
+    const wasAlwaysGroup = current.alwaysGroup;
     try {
       current = readConfig(config);
     } catch (error) {
@@ -200,5 +280,8 @@ export function apply(ctx: Context, config?: unknown): void {
     services.logger.info?.(
       `[${PLUGIN_LABEL}] config updated: folders=${String(current.folders.length)}`,
     );
+    // 勾选并保存后立即分组一次；已开启时的其他配置更新不触发
+    if (!wasAlwaysGroup && current.alwaysGroup) return runAutoGroup();
+    return undefined;
   });
 }

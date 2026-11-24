@@ -261,3 +261,100 @@ describe('检索选项热更新', () => {
     expect(Array.from(result?.results[0]?.description ?? '')).toHaveLength(40);
   });
 });
+
+describe('始终分组', () => {
+  /** 新增的飞书技能。 */
+  const larkIm = {
+    name: 'lark-im',
+    description: '飞书消息',
+    invocation: { modelInvocable: true, userInvocable: true },
+    source: 'user-agents',
+    provider: 'filesystem',
+    path: 'C:/Users/me/.agents/skills/lark-im/SKILL.md',
+  };
+
+  it('订阅 skills/change', () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, {});
+    expect(ctx._listeners.map((entry) => entry.event)).toContain('skills/change');
+  });
+
+  it('开启后技能变化时按前缀写入配置，保留其他键', async () => {
+    const folders = [{ name: 'lark', description: '飞书', skills: ['lark-sheet', 'lark-doc'] }];
+    const config = { folders, alwaysGroup: true, defaultLimit: 9 };
+    const ctx = makePluginCtx({ config });
+    apply(ctx as never, config);
+    ctx.snapshot = async () => ({
+      skills: [...ctx.skillsFixture, larkIm],
+      complete: true,
+    });
+    await ctx._emit('skills/change');
+    expect(ctx._edits).toHaveLength(1);
+    expect(ctx._edits[0]?.['folders']).toEqual([
+      { name: 'lark', description: '飞书', skills: ['lark-sheet', 'lark-doc', 'lark-im'] },
+    ]);
+    expect(ctx._edits[0]?.['defaultLimit']).toBe(9);
+  });
+
+  it('关闭时不读取技能也不写配置', async () => {
+    const ctx = makePluginCtx();
+    let snapshots = 0;
+    ctx.snapshot = async () => {
+      snapshots += 1;
+      return { skills: ctx.skillsFixture, complete: true };
+    };
+    apply(ctx as never, { alwaysGroup: false, folders: [] });
+    await ctx._emit('skills/change');
+    expect(ctx._edits).toEqual([]);
+    expect(snapshots).toBe(0);
+  });
+
+  it('分组结果没有变化时不写配置', async () => {
+    const folders = [{ name: 'lark', description: '', skills: ['lark-doc', 'lark-sheet'] }];
+    const ctx = makePluginCtx({ config: { folders } });
+    apply(ctx as never, { folders, alwaysGroup: true });
+    await ctx._emit('skills/change');
+    expect(ctx._edits).toEqual([]);
+  });
+
+  it('勾选并保存后立即分组一次', async () => {
+    const alwaysGroup = volatile(false);
+    const ctx = makePluginCtx({ config: {} });
+    apply(ctx as never, { alwaysGroup, folders: [] });
+    alwaysGroup.set(true);
+    await ctx._emit('loader/volatile-update', [['alwaysGroup']]);
+    expect(ctx._edits).toHaveLength(1);
+    expect(ctx._edits[0]?.['folders']).toEqual([
+      { name: 'lark', description: '', skills: ['lark-doc', 'lark-sheet'] },
+    ]);
+  });
+
+  it('已开启时的其他配置更新不触发分组', async () => {
+    const alwaysGroup = volatile(true);
+    const ctx = makePluginCtx({ config: {} });
+    apply(ctx as never, { alwaysGroup, folders: [] });
+    await ctx._emit('loader/volatile-update', [['defaultLimit']]);
+    expect(ctx._edits).toEqual([]);
+  });
+
+  it('配置编辑器缺失时保持原分组并记录警告', async () => {
+    const ctx = makePluginCtx({ configEditor: false });
+    apply(ctx as never, { alwaysGroup: true, folders: [] });
+    await ctx._emit('skills/change');
+    expect(ctx._edits).toEqual([]);
+    expect(
+      ctx._loggerCalls.some(
+        (call) => call.level === 'warn' && String(call.args[0]).includes('config editor'),
+      ),
+    ).toBe(true);
+  });
+
+  it('技能读取失败时保持原分组并记录警告', async () => {
+    const ctx = makePluginCtx();
+    ctx.snapshot = undefined;
+    apply(ctx as never, { alwaysGroup: true, folders: [] });
+    await ctx._emit('skills/change');
+    expect(ctx._edits).toEqual([]);
+    expect(ctx._loggerCalls.some((call) => call.level === 'warn')).toBe(true);
+  });
+});
