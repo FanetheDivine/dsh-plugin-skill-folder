@@ -10,13 +10,14 @@ const initialValue: FolderFields = {
   folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }],
   defaultLimit: 5,
   descriptionMaxLength: 320,
+  alwaysGroup: false,
 };
 
 /** 构造一组完整快照。 */
 function setup(value: FolderFields | null = initialValue) {
   const fake = makeConfigFormScope<FolderFields>({
     value: value ?? undefined,
-    base: { folders: [], defaultLimit: 5, descriptionMaxLength: 320 },
+    base: { folders: [], defaultLimit: 5, descriptionMaxLength: 320, alwaysGroup: false },
     user: value === null ? undefined : { folders: value.folders },
   });
   const form = new FolderForm(fake.scope as SettingsFormScope<FolderFields>);
@@ -237,5 +238,38 @@ describe('生命周期', () => {
     expect(fake.subscriberCount()).toBe(1);
     form.dispose();
     expect(fake.subscriberCount()).toBe(0);
+  });
+});
+
+describe('始终分组开关', () => {
+  it('默认关闭时草稿为空', () => {
+    const { form } = setup();
+    expect(draftOf(form).state.alwaysGroup.text).toBe('');
+    expect(draftOf(form).state.alwaysGroup.invalid).toBe(false);
+  });
+
+  it('已开启时草稿为 true', () => {
+    const { form } = setup({ ...initialValue, alwaysGroup: true });
+    expect(draftOf(form).state.alwaysGroup.text).toBe('true');
+  });
+
+  it('勾选写入 true，取消清除该键', async () => {
+    const { fake, form } = setup();
+    form.edit('alwaysGroup', 'true');
+    await form.save();
+    expect(fake.writes[0]).toEqual([{ op: 'set', path: ['alwaysGroup'], value: true }]);
+
+    const cleared = makeConfigFormScope<FolderFields>({ value: initialValue });
+    const second = new FolderForm(cleared.scope as SettingsFormScope<FolderFields>);
+    second.edit('alwaysGroup', 'false');
+    await second.save();
+    expect(cleared.writes[0]).toEqual([{ op: 'unset', path: ['alwaysGroup'] }]);
+  });
+
+  it('非法草稿阻止保存', () => {
+    const { form } = setup();
+    form.edit('alwaysGroup', 'yes');
+    expect(draftOf(form).state.alwaysGroup.invalid).toBe(true);
+    expect(draftOf(form).state.invalid).toBe(true);
   });
 });

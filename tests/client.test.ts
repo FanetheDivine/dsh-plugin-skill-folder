@@ -53,6 +53,7 @@ function pageState(overrides: Partial<FolderFormState> = {}): FolderFormState {
     },
     defaultLimit: { text: '5', overridden: false, invalid: false },
     descriptionMaxLength: { text: '320', overridden: false, invalid: false },
+    alwaysGroup: { text: '', overridden: false, invalid: false },
     ...overrides,
   };
 }
@@ -432,6 +433,31 @@ describe('按前缀自动分组', () => {
   it('页面渲染自动分组按钮', () => {
     expect(renderPage('page', zh)).toContain('按前缀自动分组');
     expect(renderPage('page', en)).toContain('Group by prefix');
+  });
+
+  it('按钮右侧渲染始终分组勾选框与一句说明', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('始终分组');
+    expect(html).toContain('type="checkbox"');
+    expect(html).toContain('技能变化时自动按前缀分组一次');
+    expect(renderPage('page', en)).toContain('Keep grouping');
+  });
+
+  it('勾选状态来自草稿', () => {
+    const checked = renderPage(
+      'page',
+      zh,
+      pageState({
+        alwaysGroup: { text: 'true', overridden: true, invalid: false },
+      }),
+    );
+    expect(checked).toContain('checked');
+    expect(renderPage('page', zh)).not.toContain('checked');
+  });
+
+  it('只读时勾选框禁用', () => {
+    const html = renderPage('page', zh, pageState({ writable: false }));
+    expect(html).toContain('disabled');
   });
 
   it('把未分组技能按前缀写入文件夹，简介按当前语言生成', () => {
