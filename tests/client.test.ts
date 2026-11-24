@@ -7,9 +7,8 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-
+import { autoGroup as autoGroupFolders } from '../src/auto-group.ts';
 import { parseSkillsPayload } from '../src/client/api.ts';
-import { autoGroup as autoGroupFolders } from '../src/client/auto-group.ts';
 import { type FolderFormState, ROW_ID, ROW_KEY } from '../src/client/folder-form.ts';
 import {
   collapsedAfterRemoval,

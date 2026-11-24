@@ -19,12 +19,11 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-
+import { autoGroup } from '../auto-group.ts';
 import type { FolderConfig } from '../config.ts';
 import { UNGROUPED_ID } from '../constants.ts';
 import { ungroupedOf, validateFolders } from '../folders.ts';
 import type { SkillItem, SkillsPayload } from './api.ts';
-import { autoGroup } from './auto-group.ts';
 import { FolderCard, folderDropId } from './folder-card.tsx';
 import { coerceFolders, type FolderPageInjected } from './folder-form.ts';
 import type { NS } from './locales.ts';

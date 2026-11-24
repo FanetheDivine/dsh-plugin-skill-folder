@@ -1,6 +1,6 @@
 // 自动分组测试：文件夹名匹配、最长名称优先、首段前缀合并、成员下限与组名规则。
 import { describe, expect, it } from 'vitest';
-import { autoGroup, longestSegmentPrefix, segmentPrefix } from '../src/client/auto-group.ts';
+import { autoGroup, longestSegmentPrefix, sameFolders, segmentPrefix } from '../src/auto-group.ts';
 import type { FolderConfig } from '../src/config.ts';
 
 /** 生成简介：`<前缀> 系列技能`。 */
@@ -117,5 +117,38 @@ describe('顺序与稳定性', () => {
     const once = autoGroup([], ['lark-a', 'lark-b'], makeDescription);
     const twice = autoGroup(once, ['lark-a', 'lark-b'], makeDescription);
     expect(shape(twice)).toEqual(shape(once));
+  });
+});
+
+describe('结果比较', () => {
+  const base: FolderConfig[] = [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }];
+
+  it('名称、简介与成员一致时视为相同', () => {
+    expect(sameFolders(base, [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }])).toBe(
+      true,
+    );
+  });
+
+  it('名称、简介、成员或数量不同时视为不同', () => {
+    expect(sameFolders(base, [{ name: 'Lark', description: '飞书', skills: ['lark-doc'] }])).toBe(
+      false,
+    );
+    expect(sameFolders(base, [{ name: 'lark', description: '', skills: ['lark-doc'] }])).toBe(
+      false,
+    );
+    expect(
+      sameFolders(base, [{ name: 'lark', description: '飞书', skills: ['lark-doc', 'x'] }]),
+    ).toBe(false);
+    expect(sameFolders(base, [])).toBe(false);
+  });
+
+  it('成员顺序不同时视为不同', () => {
+    const other: FolderConfig[] = [
+      { name: 'lark', description: '飞书', skills: ['lark-doc', 'lark-im'] },
+    ];
+    const reordered: FolderConfig[] = [
+      { name: 'lark', description: '飞书', skills: ['lark-im', 'lark-doc'] },
+    ];
+    expect(sameFolders(other, reordered)).toBe(false);
   });
 });
