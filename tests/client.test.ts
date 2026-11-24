@@ -24,6 +24,16 @@ import {
   moveTargetOf,
   UNGROUPED_ID,
 } from '../src/client/skill-chip.tsx';
+import {
+  cardBodyStyle,
+  cardStyle,
+  chipListStyle,
+  folderCardStyle,
+  memberBodyStyle,
+  memberScrollStyle,
+  scrollbarStyleText,
+} from '../src/client/styles.ts';
+import { FOLDER_CARD_MAX_HEIGHT } from '../src/constants.ts';
 import { type ClientServiceName, makeClientCtx } from './helpers.ts';
 
 const { apply } = clientEntry;
@@ -330,6 +340,64 @@ describe('配置页渲染', () => {
   it('有未保存修改时显示放弃按钮', () => {
     expect(renderPage('page', zh, pageState({ dirty: true }))).toContain('放弃修改');
     expect(renderPage('page', zh)).not.toContain('放弃修改');
+  });
+});
+
+describe('文件夹卡片限高与成员区滚动', () => {
+  it('卡片整体以 500px 为上限，内边距交给内层', () => {
+    expect(FOLDER_CARD_MAX_HEIGHT).toBe(500);
+    expect(folderCardStyle.maxHeight).toBe(FOLDER_CARD_MAX_HEIGHT);
+    expect(folderCardStyle.overflow).toBe('hidden');
+    expect(folderCardStyle.padding).toBe(0);
+    expect(folderCardStyle.gap).toBe(0);
+    expect(cardBodyStyle.padding).toBe(14);
+    expect(cardBodyStyle.flexShrink).toBe(0);
+  });
+
+  it('成员区滚动容器零内边距，可纵向收缩', () => {
+    expect(memberScrollStyle.padding).toBeUndefined();
+    expect(memberScrollStyle.overflowY).toBe('auto');
+    expect(memberScrollStyle.minHeight).toBe(0);
+  });
+
+  it('条目内缩由滚动容器内层承担，条目继续折行', () => {
+    expect(memberBodyStyle.padding).toBe('0 14px 14px');
+    expect(memberBodyStyle.flexWrap).toBe('wrap');
+  });
+
+  it('未分组区域保持自然高度且不滚动', () => {
+    expect(cardStyle.maxHeight).toBeUndefined();
+    expect(cardStyle.padding).toBe(14);
+    expect(chipListStyle.overflowY).toBeUndefined();
+  });
+
+  it('渲染时文件夹卡片带限高，成员区可滚动', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('max-height:500px');
+    const members = html.match(/<div[^>]*data-folder-members="lark"[^>]*>/)?.[0] ?? '';
+    expect(members).toContain('overflow-y:auto');
+  });
+
+  it('没有文件夹时页面不出现限高与滚动容器', () => {
+    const html = renderPage(
+      'page',
+      zh,
+      pageState({
+        folders: { text: '[]', overridden: true, invalid: false },
+      }),
+    );
+    expect(html).toContain('data-ungrouped');
+    expect(html).not.toContain('max-height:500px');
+    expect(html).not.toContain('overflow-y:auto');
+  });
+
+  it('成员区滚动条贴合卡片内边缘并按主题着色', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('data-skill-folder-scrollbar-styles');
+    expect(scrollbarStyleText).toContain('[data-folder-members]::-webkit-scrollbar {');
+    expect(scrollbarStyleText).toContain('width: 8px');
+    expect(scrollbarStyleText).toContain('var(--dsw-alias-label-secondary)');
+    expect(scrollbarStyleText).toContain('@supports not selector(::-webkit-scrollbar)');
   });
 });
 

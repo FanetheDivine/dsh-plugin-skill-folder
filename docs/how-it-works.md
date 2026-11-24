@@ -101,6 +101,16 @@ DSH 插件是一个 npm 包。宿主按约定的入口加载它。
 - `alwaysGroup` 是布尔开关：勾选写入 `true`，取消勾选清除该键并回落到默认值。
 - 保存、放弃、恢复默认与只读状态都由宿主提供。
 
+### 卡片限高与滚动
+
+文件夹卡片整体上限 `FOLDER_CARD_MAX_HEIGHT`（500px）：
+
+- 卡片外框不设内边距，标题行、名称错误与简介放进 `cardBodyStyle` 内层。
+- 成员区滚动容器 `memberScrollStyle` 零内边距，条目内缩由 `memberBodyStyle` 承担，滚动条因此贴住卡片内边缘。
+- 成员区用 `flex: 0 1 auto` 与 `min-height: 0` 收缩到卡片剩余高度。
+- 滚动条样式由 `scrollbarStyleText` 注入：Chromium 用 `::-webkit-scrollbar` 得到 8px 细滚动条，其他引擎在 `@supports not selector(::-webkit-scrollbar)` 下用标准滚动条属性。
+- 「未分组的技能」区域保持自然高度，不套用限高。
+
 ### 自动分组
 
 `autoGroup` 是纯函数，只处理未分组技能，两步完成：先按文件夹名匹配，再按首段前缀合并。规则见 README 的「分组」节。`sameFolders` 逐项比较结果，用于跳过无变化的写入。

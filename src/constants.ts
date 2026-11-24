@@ -36,5 +36,8 @@ export const MAX_FOLDER_NAME_LENGTH = 64;
 /** 文件夹简介字符上限。 */
 export const MAX_FOLDER_DESCRIPTION_LENGTH = 500;
 
+/** 文件夹卡片高度上限（px），超出的成员在卡片内滚动。 */
+export const FOLDER_CARD_MAX_HEIGHT = 500;
+
 /** 未分组区域在界面与拖放中的标识。 */
 export const UNGROUPED_ID = '__ungrouped__';
