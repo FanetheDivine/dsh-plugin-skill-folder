@@ -31,6 +31,8 @@ export interface FolderFields {
   defaultLimit: number;
   /** 摘要字符上限。 */
   descriptionMaxLength: number;
+  /** 技能集合变化时是否自动按前缀分组。 */
+  alwaysGroup: boolean;
 }
 
 /** 配置页读取的草稿与表单状态。 */
@@ -41,6 +43,8 @@ export interface FolderFormState extends SettingsFormShell {
   defaultLimit: SettingsFieldState;
   /** 摘要字符上限。 */
   descriptionMaxLength: SettingsFieldState;
+  /** 始终分组开关。 */
+  alwaysGroup: SettingsFieldState;
 }
 
 /** 配置页的编辑动作。 */
@@ -108,6 +112,17 @@ const foldersSpec: SettingsFieldSpec = {
   },
 };
 
+/** 布尔字段：`true` 开启，`false` 清除该键并回落到默认值。 */
+const alwaysGroupSpec: SettingsFieldSpec = {
+  field: 'alwaysGroup',
+  format: (value) => (value === true ? 'true' : ''),
+  parse: (text) => {
+    if (text === 'true') return { kind: 'set', value: true };
+    if (text === 'false') return { kind: 'clear' };
+    return undefined;
+  },
+};
+
 /** 整数字段：空草稿恢复默认，越界或非整数时阻止保存。 */
 function integerSpec(field: string, min: number, max: number): SettingsFieldSpec {
   return {
@@ -143,6 +158,7 @@ export class FolderForm {
         DESCRIPTION_MAX_LENGTH_RANGE.min,
         DESCRIPTION_MAX_LENGTH_RANGE.max,
       ),
+      alwaysGroupSpec,
     ]);
     this.actions = this.form.actions();
     this.state = this.form.bind(() => ({
@@ -150,6 +166,7 @@ export class FolderForm {
       folders: this.form.field('folders'),
       defaultLimit: this.form.field('defaultLimit'),
       descriptionMaxLength: this.form.field('descriptionMaxLength'),
+      alwaysGroup: this.form.field('alwaysGroup'),
     }));
   }
 

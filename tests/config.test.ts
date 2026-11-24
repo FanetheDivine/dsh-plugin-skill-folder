@@ -18,6 +18,7 @@ describe('默认配置', () => {
       folders: [],
       defaultLimit: 5,
       descriptionMaxLength: 320,
+      alwaysGroup: false,
     });
   });
 
@@ -91,6 +92,27 @@ describe('数值范围', () => {
   });
 });
 
+describe('布尔开关', () => {
+  it('alwaysGroup 默认关闭', () => {
+    expect(resolveConfig({}).alwaysGroup).toBe(false);
+    expect(DEFAULT_CONFIG.alwaysGroup).toBe(false);
+  });
+
+  it('alwaysGroup 只接受布尔值', () => {
+    expect(resolveConfig({ alwaysGroup: true }).alwaysGroup).toBe(true);
+    expect(resolveConfig({ alwaysGroup: false }).alwaysGroup).toBe(false);
+    for (const value of [1, 'true', null]) {
+      expect(() => resolveConfig({ alwaysGroup: value })).toThrow('alwaysGroup');
+    }
+  });
+
+  it('Config schema 提供默认值与实时读取', () => {
+    const parsed = Config({ alwaysGroup: true });
+    expect(parsed.alwaysGroup.get()).toBe(true);
+    expect(Config({}).alwaysGroup.get()).toBe(false);
+  });
+});
+
 describe('严格校验', () => {
   it('未知键报错并带插件标识', () => {
     expect(() => resolveConfig({ bogus: 1 })).toThrow('unknown config key "bogus"');
@@ -108,8 +130,16 @@ describe('严格校验', () => {
 
 describe('读取实时配置 readConfig', () => {
   it('展开热重载引用后校验', () => {
-    const config = { defaultLimit: volatile(7), descriptionMaxLength: volatile(120) };
-    expect(readConfig(config)).toMatchObject({ defaultLimit: 7, descriptionMaxLength: 120 });
+    const config = {
+      defaultLimit: volatile(7),
+      descriptionMaxLength: volatile(120),
+      alwaysGroup: volatile(true),
+    };
+    expect(readConfig(config)).toMatchObject({
+      defaultLimit: 7,
+      descriptionMaxLength: 120,
+      alwaysGroup: true,
+    });
   });
 
   it('引用变化后读到新值', () => {

@@ -55,6 +55,8 @@ export const zh = {
   'autoGroup.label': '按前缀自动分组',
   'autoGroup.hint': '先按文件夹名匹配，其余按 - 分段最长公共前缀合并，成员不少于 2 个才成组。',
   'autoGroup.description': '{prefix} 系列技能',
+  'autoGroup.always.label': '始终分组',
+  'autoGroup.always.hint': '勾选后，技能变化时自动按前缀分组一次；效果与左侧按钮相同。',
   'filter.label': '筛选技能',
   'filter.placeholder': '按名称或描述筛选',
   'filter.clear': '清除筛选',
@@ -120,6 +122,9 @@ export const en: Record<FolderKey, string> = {
   'autoGroup.hint':
     'Matches folder names first, then merges the rest by their longest shared - segment prefix; a group needs at least 2 members.',
   'autoGroup.description': 'Skills in the {prefix} family',
+  'autoGroup.always.label': 'Keep grouping',
+  'autoGroup.always.hint':
+    'When checked, skills are grouped by prefix after each change, just like the button on the left.',
   'filter.label': 'Filter skills',
   'filter.placeholder': 'Filter by name or description',
   'filter.clear': 'Clear filter',
