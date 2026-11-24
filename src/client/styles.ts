@@ -58,6 +58,7 @@ export const toolbarStyle: CSSProperties = {
 export const toolbarActionsStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
+  alignItems: 'center',
   gap: 8,
 };
 

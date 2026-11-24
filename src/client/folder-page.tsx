@@ -7,7 +7,7 @@
 // Type-only：拉取 plugins.row.config 槽位声明。
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
 import type { SettingsFormLabels } from '@deepseek-ai/dsh-client-ui-primitives';
-import { SettingsForm, SettingsValueField } from '@deepseek-ai/dsh-client-ui-primitives';
+import { Checkbox, SettingsForm, SettingsValueField } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import {
   DndContext,
@@ -19,12 +19,11 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-
+import { autoGroup } from '../auto-group.ts';
 import type { FolderConfig } from '../config.ts';
 import { UNGROUPED_ID } from '../constants.ts';
 import { ungroupedOf, validateFolders } from '../folders.ts';
 import type { SkillItem, SkillsPayload } from './api.ts';
-import { autoGroup } from './auto-group.ts';
 import { FolderCard, folderDropId } from './folder-card.tsx';
 import { coerceFolders, type FolderPageInjected } from './folder-form.ts';
 import type { NS } from './locales.ts';
@@ -389,6 +388,15 @@ export function FolderPage(props: FolderPageProps) {
             >
               {t('autoGroup.label')}
             </button>
+            <Checkbox
+              label={t('autoGroup.always.label')}
+              title={t('autoGroup.always.hint')}
+              checked={form.alwaysGroup.text === 'true'}
+              disabled={disabled}
+              onChange={(checked) => {
+                props.edit('alwaysGroup', checked ? 'true' : 'false');
+              }}
+            />
             {form.dirty ? (
               <button
                 type="button"

@@ -1,9 +1,9 @@
 /**
  * 自动分组：先按文件夹名匹配，其余未分组技能按 `-` 分段前缀合并。
- * 导出 segmentPrefix、longestSegmentPrefix 与 autoGroup。
+ * 导出 segmentPrefix、longestSegmentPrefix、sameFolders 与 autoGroup。
  */
-import type { FolderConfig } from '../config.ts';
-import { autoGroupNameKey, folderIndex } from '../folders.ts';
+import type { FolderConfig } from './config.ts';
+import { autoGroupNameKey, folderIndex } from './folders.ts';
 
 /** 分组所需的最少成员数。 */
 const MIN_GROUP_SIZE = 2;
@@ -24,6 +24,21 @@ export function longestSegmentPrefix(names: readonly string[]): string {
     else break;
   }
   return common.join('-');
+}
+
+/** 判断两组文件夹在名称、简介与成员上完全一致。 */
+export function sameFolders(a: readonly FolderConfig[], b: readonly FolderConfig[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((folder, index) => {
+    const other = b[index];
+    if (other === undefined) return false;
+    return (
+      folder.name === other.name &&
+      folder.description === other.description &&
+      folder.skills.length === other.skills.length &&
+      folder.skills.every((skill, at) => skill === other.skills[at])
+    );
+  });
 }
 
 /** 按名称比较。 */

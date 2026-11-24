@@ -39,17 +39,18 @@ DSH 插件是一个 npm 包。宿主按约定的入口加载它。
 | `src/catalog.ts` | 把原生技能目录改写为「未归组条目 + 文件夹摘要」 |
 | `src/routes.ts` | `GET /api/skill-folder/skills` |
 | `src/client/folder-form.ts` | 配置页草稿模型 |
-| `src/client/auto-group.ts` | 按前缀自动分组 |
+| `src/auto-group.ts` | 按前缀自动分组（宿主与配置页共用） |
 | `src/client/folder-page.tsx` | 配置页视图与拖拽上下文 |
 
 ## 运行流程
 
-`apply` 依次完成四件事：
+`apply` 依次完成五件事：
 
 1. `readConfig` 读取配置当前值，非法值让插件加载失败。
 2. 注册 `skill_search`，工具闭包读取当前配置。
 3. 用 `prepend: true` 注册 `agent/pre-step` 监听，改写本次步骤的技能目录。
 4. 经 `ctx.inject(['connection'])` 注册全局技能列表路由；路由按默认 preset 的作用域读取技能。
+5. 订阅 `skills/change`；「始终分组」开启时按变化重算文件夹并写回配置。
 
 ### 目录改写
 
@@ -97,11 +98,16 @@ DSH 插件是一个 npm 包。宿主按约定的入口加载它。
 - `folders` 字段的草稿文本是 JSON。界面结构化编辑后序列化写回。
 - `parse` 校验 JSON 与文件夹规则，非法时返回 `undefined`，保存按钮随之禁用。
 - `defaultLimit` 与 `descriptionMaxLength` 用整数字段，越界时标记字段非法。
+- `alwaysGroup` 是布尔开关：勾选写入 `true`，取消勾选清除该键并回落到默认值。
 - 保存、放弃、恢复默认与只读状态都由宿主提供。
 
 ### 自动分组
 
-`autoGroup` 是纯函数，只处理未分组技能，两步完成：先按文件夹名匹配，再按首段前缀合并。规则见 README 的「分组」节。
+`autoGroup` 是纯函数，只处理未分组技能，两步完成：先按文件夹名匹配，再按首段前缀合并。规则见 README 的「分组」节。`sameFolders` 逐项比较结果，用于跳过无变化的写入。
+
+### 始终分组
+
+`alwaysGroup` 开启时，插件在 `skills/change` 后重新读取全局技能，按上述规则分组；结果与当前配置不同时经 `configEditor.edit` 写回 `folders`。`loader/volatile-update` 中 `alwaysGroup` 由 false 变 true 时立即执行一次。执行串行，期间的触发合并为一次；技能读取或配置写入失败只记录警告，保持现有分组。
 
 ### 路由
 

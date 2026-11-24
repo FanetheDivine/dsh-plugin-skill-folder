@@ -34,6 +34,8 @@ export interface Config {
   defaultLimit: Volatile<number>;
   /** 摘要字符上限。 */
   descriptionMaxLength: Volatile<number>;
+  /** 技能集合变化时是否自动按前缀分组。 */
+  alwaysGroup: Volatile<boolean>;
 }
 
 /** 文件夹 schema：结构校验交给 resolveConfig。 */
@@ -51,6 +53,7 @@ export const Config: Schema<Config> = Schema.object({
   folders: Schema.array(folderSchema).default([]).volatile(),
   defaultLimit: Schema.number().default(DEFAULT_LIMIT).volatile(),
   descriptionMaxLength: Schema.number().default(DEFAULT_DESCRIPTION_MAX_LENGTH).volatile(),
+  alwaysGroup: Schema.boolean().default(false).volatile(),
 }) as unknown as Schema<Config>;
 
 /** 配置项的实时取值。 */
@@ -61,6 +64,8 @@ export type PluginConfig = {
   defaultLimit: number;
   /** 摘要字符上限。 */
   descriptionMaxLength: number;
+  /** 技能集合变化时是否自动按前缀分组。 */
+  alwaysGroup: boolean;
 };
 
 /** 默认配置。 */
@@ -68,10 +73,16 @@ export const DEFAULT_CONFIG: Readonly<PluginConfig> = Object.freeze({
   folders: [],
   defaultLimit: DEFAULT_LIMIT,
   descriptionMaxLength: DEFAULT_DESCRIPTION_MAX_LENGTH,
+  alwaysGroup: false,
 });
 
 /** 合法的配置键。出现其他键时报错。 */
-const CONFIG_KEYS = new Set<string>(['folders', 'defaultLimit', 'descriptionMaxLength']);
+const CONFIG_KEYS = new Set<string>([
+  'folders',
+  'defaultLimit',
+  'descriptionMaxLength',
+  'alwaysGroup',
+]);
 
 /** 把缺省或 null 的输入转为空对象。 */
 function normalizeConfigInput(raw: unknown): Record<string, unknown> {
@@ -158,6 +169,15 @@ function resolveInteger(
   return value;
 }
 
+/** 校验一个布尔配置项。只有缺省的 `undefined` 使用默认值。 */
+function resolveBoolean(key: string, value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') {
+    throw new Error(`${PLUGIN_LABEL}: config ${key} must be a boolean`);
+  }
+  return value;
+}
+
 /** 校验配置并与默认值合并，返回冻结的完整配置。 */
 export function resolveConfig(raw?: unknown): Readonly<PluginConfig> {
   const input = normalizeConfigInput(raw);
@@ -180,6 +200,7 @@ export function resolveConfig(raw?: unknown): Readonly<PluginConfig> {
       DESCRIPTION_MAX_LENGTH_RANGE.max,
       DEFAULT_CONFIG.descriptionMaxLength,
     ),
+    alwaysGroup: resolveBoolean('alwaysGroup', input['alwaysGroup'], DEFAULT_CONFIG.alwaysGroup),
   };
   return Object.freeze(config);
 }

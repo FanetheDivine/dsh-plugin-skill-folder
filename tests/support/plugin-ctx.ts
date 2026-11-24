@@ -44,6 +44,10 @@ export interface PluginCtxOptions {
   cwd?: string;
   /** `connection` 服务是否可用，默认可用。 */
   connection?: boolean;
+  /** 是否提供 `configEditor`，默认提供。 */
+  configEditor?: boolean;
+  /** 原始配置，供 `configEditor.edit` 的回调读取。 */
+  config?: Record<string, unknown>;
 }
 
 /** 一条注册的 Fetch 路由。 */
@@ -100,6 +104,9 @@ export function makePluginCtx(options: PluginCtxOptions = {}) {
   const effectDisposers: Array<() => void> = [];
   const routes: RouteStub[] = [];
   const catalog = catalogMessage(skills);
+  /** 每次 `configEditor.edit` 写入的完整配置。 */
+  const edits: Record<string, unknown>[] = [];
+  let rawConfig: Record<string, unknown> = { ...(options.config ?? {}) };
 
   /** 按名称读取已注册的工具。 */
   const findTool = (toolName: string): ToolStub | undefined =>
@@ -119,6 +126,24 @@ export function makePluginCtx(options: PluginCtxOptions = {}) {
       listeners.push({ event, fn, options: opts });
       return () => undefined;
     },
+    /** 读取宿主服务；只提供本插件用到的 `configEditor`。 */
+    get(name: string) {
+      if (name !== 'configEditor' || options.configEditor === false) return undefined;
+      return {
+        edit: async (
+          _entry: unknown,
+          change: (
+            current: Record<string, unknown>,
+            inherited: Record<string, unknown>,
+          ) => Record<string, unknown>,
+        ) => {
+          rawConfig = change({ ...rawConfig }, {});
+          edits.push(rawConfig);
+        },
+      };
+    },
+    /** 插件在 profile 中的装载条目。 */
+    fiber: { entry: { id: 'dsh-plugin-skill-folder' } },
     inject(deps: string[], callback: (child: unknown) => unknown) {
       if (deps.includes('connection') && options.connection === false) return () => undefined;
       callback(ctx);
@@ -180,12 +205,15 @@ export function makePluginCtx(options: PluginCtxOptions = {}) {
     _activeTools: activeTools,
     /** 读取某事件的注册选项。 */
     _onOptions: (event: string) => listeners.find((entry) => entry.event === event)?.options,
-    /** 触发一个 emit 事件。 */
-    _emit: (event: string, ...args: unknown[]) => {
-      for (const entry of listeners.filter((item) => item.event === event)) {
-        void entry.fn(args[0], undefined);
-      }
+    /** 触发一个 emit 事件，等全部监听返回。 */
+    _emit: async (event: string, ...args: unknown[]) => {
+      const pending = listeners
+        .filter((item) => item.event === event)
+        .map((entry) => entry.fn(args[0], undefined));
+      await Promise.all(pending);
     },
+    /** 模拟宿主写入的配置。 */
+    _edits: edits,
     /** 运行全部 agent/pre-step 监听，返回最外层结果。 */
     _runPreStep: async (payload: unknown, next: () => Promise<unknown>) => {
       const chain = listeners
