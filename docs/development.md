@@ -90,13 +90,13 @@
 
 | 文件 | 覆盖内容 |
 | --- | --- |
-| `tests/plugin.test.ts` | `apply` 接线、目录折叠、检索工具注册、路由与热更新 |
+| `tests/plugin.test.ts` | `apply` 接线、目录折叠、检索工具注册、路由、热更新与始终分组 |
 | `tests/config.test.ts` | 配置默认值、文件夹规则、数值范围、未知键与实时读取 |
 | `tests/folders.test.ts` | 文件夹名称规则、成员唯一、查找与未分组集合 |
 | `tests/skills.test.ts` | 模型可调用过滤、全局来源与路径判定、全局列表读取 |
 | `tests/search.test.ts` | 分词、排序、准确名称优先、分页、截断与按文件夹列出 |
 | `tests/catalog.test.ts` | 目录折叠文本、项目级覆盖、空文件夹与保持原样 |
-| `tests/auto-group.test.ts` | 文件夹名匹配、前缀合并、成员下限与组名规则 |
+| `tests/auto-group.test.ts` | 文件夹名匹配、前缀合并、成员下限、组名规则与结果比较 |
 | `tests/folder-form.test.ts` | 配置页草稿的格式化与解析、编辑、校验、保存与放弃 |
 | `tests/release-archive.test.mjs` | CHANGELOG 归档计划 |
 | `tests/client.test.ts` | 前端服务分组、字典键集、配置页注册与渲染 |
@@ -194,12 +194,12 @@ src/
 ├── search-tool.ts          # skill_search 工具定义与参数校验
 ├── catalog.ts              # 原生技能目录的折叠改写
 ├── routes.ts               # GET /api/skill-folder/skills
+├── auto-group.ts           # 按前缀自动分组（宿主与配置页共用）
 ├── types.ts                # 宿主类型再导出
 ├── utils.ts                # 零依赖工具函数
 └── client/
     ├── index.ts            # 浏览器入口：注册字典与插件行配置页
     ├── api.ts              # 全局技能列表的读取与解析
-    ├── auto-group.ts       # 按前缀自动分组
     ├── folder-form.ts      # 配置页草稿模型与行键常量
     ├── folder-page.tsx     # 配置页视图与拖拽上下文
     ├── folder-card.tsx     # 文件夹卡片与放置区
