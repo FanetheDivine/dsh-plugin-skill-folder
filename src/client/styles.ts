@@ -4,6 +4,8 @@
  */
 import type { CSSProperties } from 'react';
 
+import { FOLDER_CARD_MAX_HEIGHT } from '../constants.ts';
+
 /** 页面纵向栈，限制内容宽度并允许窄屏收缩。 */
 export const pageStyle: CSSProperties = {
   display: 'flex',
@@ -258,6 +260,39 @@ export const cardActiveStyle: CSSProperties = {
   background: 'var(--dsw-alias-bg-layer-2)',
 };
 
+/** 文件夹卡片外框：内边距交给内层，滚动条才能贴住卡片内边缘。 */
+export const folderCardStyle: CSSProperties = {
+  ...cardStyle,
+  gap: 0,
+  padding: 0,
+  maxHeight: FOLDER_CARD_MAX_HEIGHT,
+  overflow: 'hidden',
+};
+
+/** 文件夹卡片被拖拽经过时的放置区高亮。 */
+export const folderCardActiveStyle: CSSProperties = {
+  ...folderCardStyle,
+  borderColor: 'var(--dsw-alias-brand-primary)',
+  background: 'var(--dsw-alias-bg-layer-2)',
+};
+
+/** 卡片内层：承载标题行、名称错误与简介的内边距。 */
+export const cardBodyStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  flexShrink: 0,
+  gap: 10,
+  padding: 14,
+};
+
+/** 成员区滚动容器：零内边距，滚动条贴住卡片内边缘。 */
+export const memberScrollStyle: CSSProperties = {
+  flex: '0 1 auto',
+  minHeight: 0,
+  overflowX: 'hidden',
+  overflowY: 'auto',
+};
+
 /** 卡片标题行：名称、计数与删除按钮。 */
 export const cardHeaderStyle: CSSProperties = {
   display: 'flex',
@@ -288,6 +323,12 @@ export const chipListStyle: CSSProperties = {
   gap: 6,
   minHeight: 30,
   minWidth: 0,
+};
+
+/** 滚动容器内层：条目相对卡片边缘的内缩放在这里。 */
+export const memberBodyStyle: CSSProperties = {
+  ...chipListStyle,
+  padding: '0 14px 14px',
 };
 
 /** 一个技能条目。 */
@@ -417,5 +458,25 @@ export const focusStyleText = `
   [data-skill-folder-page] [data-skill-move][aria-expanded='true'] {
     background: var(--dsw-alias-interactive-bg-hover);
     color: var(--dsw-alias-label-primary);
+  }
+`;
+
+/** 成员区滚动条：Chromium 用 8px 细滚动条，其他引擎退回标准滚动条属性。 */
+export const scrollbarStyleText = `
+  [data-skill-folder-page] [data-folder-members]::-webkit-scrollbar {
+    width: 8px;
+  }
+  [data-skill-folder-page] [data-folder-members]::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: var(--dsw-alias-label-secondary);
+  }
+  [data-skill-folder-page] [data-folder-members]::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    [data-skill-folder-page] [data-folder-members] {
+      scrollbar-width: thin;
+      scrollbar-color: var(--dsw-alias-label-secondary) transparent;
+    }
   }
 `;
