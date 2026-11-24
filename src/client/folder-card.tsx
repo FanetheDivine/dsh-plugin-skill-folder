@@ -15,17 +15,19 @@ import { SkillChip } from './skill-chip.tsx';
 import {
   badgeStyle,
   cardActionsStyle,
-  cardActiveStyle,
+  cardBodyStyle,
   cardHeaderStyle,
-  cardStyle,
-  chipListStyle,
   collapseIconStyle,
   errorStyle,
+  folderCardActiveStyle,
+  folderCardStyle,
   folderNameInputStyle,
   hintStyle,
   iconButtonStyle,
   inputStyle,
   invalidInputStyle,
+  memberBodyStyle,
+  memberScrollStyle,
   textButtonStyle,
 } from './styles.ts';
 
@@ -98,112 +100,116 @@ export function FolderCard(props: FolderCardProps) {
   return (
     <section
       ref={setNodeRef}
-      style={isOver ? cardActiveStyle : cardStyle}
+      style={isOver ? folderCardActiveStyle : folderCardStyle}
       data-folder-card={folder.name}
       aria-label={folder.name}
     >
-      <div style={cardHeaderStyle}>
-        <button
-          type="button"
-          style={iconButtonStyle}
-          aria-label={t(props.collapsed ? 'folder.expand' : 'folder.collapse', {
-            name: folder.name || t('folder.name'),
-          })}
-          aria-expanded={!props.collapsed}
-          aria-controls={`${id}-members`}
-          onClick={() => {
-            props.onToggle(index);
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              ...collapseIconStyle,
-              transform: props.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-            }}
-          >
-            ▾
-          </span>
-        </button>
-        <input
-          id={`${id}-name`}
-          data-folder-name-index={index}
-          aria-label={t('folder.name')}
-          aria-invalid={nameMessage === undefined ? undefined : true}
-          aria-errormessage={nameMessage === undefined ? undefined : `${id}-name-error`}
-          placeholder={t('folder.namePlaceholder')}
-          style={
-            nameMessage === undefined
-              ? folderNameInputStyle
-              : { ...folderNameInputStyle, ...invalidInputStyle }
-          }
-          value={folder.name}
-          disabled={props.disabled}
-          onChange={(event) => {
-            props.onRename(index, event.target.value);
-          }}
-        />
-        <div style={cardActionsStyle}>
-          <span style={badgeStyle}>
-            {props.filterActive
-              ? t('folder.visibleMembers', {
-                  visible: String(props.visibleSkills.length),
-                  total: String(folder.skills.length),
-                })
-              : t('folder.members', { count: String(folder.skills.length) })}
-          </span>
+      <div style={cardBodyStyle}>
+        <div style={cardHeaderStyle}>
           <button
             type="button"
-            style={textButtonStyle}
-            disabled={props.disabled}
+            style={iconButtonStyle}
+            aria-label={t(props.collapsed ? 'folder.expand' : 'folder.collapse', {
+              name: folder.name || t('folder.name'),
+            })}
+            aria-expanded={!props.collapsed}
+            aria-controls={`${id}-members`}
             onClick={() => {
-              props.onRemove(index);
+              props.onToggle(index);
             }}
           >
-            {t('folder.delete')}
+            <span
+              aria-hidden="true"
+              style={{
+                ...collapseIconStyle,
+                transform: props.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+              }}
+            >
+              ▾
+            </span>
           </button>
+          <input
+            id={`${id}-name`}
+            data-folder-name-index={index}
+            aria-label={t('folder.name')}
+            aria-invalid={nameMessage === undefined ? undefined : true}
+            aria-errormessage={nameMessage === undefined ? undefined : `${id}-name-error`}
+            placeholder={t('folder.namePlaceholder')}
+            style={
+              nameMessage === undefined
+                ? folderNameInputStyle
+                : { ...folderNameInputStyle, ...invalidInputStyle }
+            }
+            value={folder.name}
+            disabled={props.disabled}
+            onChange={(event) => {
+              props.onRename(index, event.target.value);
+            }}
+          />
+          <div style={cardActionsStyle}>
+            <span style={badgeStyle}>
+              {props.filterActive
+                ? t('folder.visibleMembers', {
+                    visible: String(props.visibleSkills.length),
+                    total: String(folder.skills.length),
+                  })
+                : t('folder.members', { count: String(folder.skills.length) })}
+            </span>
+            <button
+              type="button"
+              style={textButtonStyle}
+              disabled={props.disabled}
+              onClick={() => {
+                props.onRemove(index);
+              }}
+            >
+              {t('folder.delete')}
+            </button>
+          </div>
         </div>
+        {nameMessage === undefined ? null : (
+          <p id={`${id}-name-error`} style={errorStyle} role="alert">
+            {nameMessage}
+          </p>
+        )}
+        <input
+          aria-label={t('folder.description')}
+          placeholder={t('folder.descriptionPlaceholder')}
+          style={inputStyle}
+          value={folder.description}
+          disabled={props.disabled}
+          onChange={(event) => {
+            props.onDescribe(index, event.target.value);
+          }}
+        />
       </div>
-      {nameMessage === undefined ? null : (
-        <p id={`${id}-name-error`} style={errorStyle} role="alert">
-          {nameMessage}
-        </p>
-      )}
-      <input
-        aria-label={t('folder.description')}
-        placeholder={t('folder.descriptionPlaceholder')}
-        style={inputStyle}
-        value={folder.description}
-        disabled={props.disabled}
-        onChange={(event) => {
-          props.onDescribe(index, event.target.value);
-        }}
-      />
       <div
         id={`${id}-members`}
-        style={props.collapsed ? { ...chipListStyle, display: 'none' } : chipListStyle}
+        style={props.collapsed ? { ...memberScrollStyle, display: 'none' } : memberScrollStyle}
         data-folder-members={folder.name}
         hidden={props.collapsed}
       >
-        {folder.skills.length === 0 ? (
-          <span style={hintStyle}>{t('folder.empty')}</span>
-        ) : props.visibleSkills.length === 0 ? (
-          <span style={hintStyle}>{t('folder.noMatches')}</span>
-        ) : (
-          props.visibleSkills.map((skill) => (
-            <SkillChip
-              key={skill}
-              name={skill}
-              description={props.descriptions.get(skill)}
-              folder={folder.name}
-              folders={props.folderNames}
-              missing={props.loaded && !props.descriptions.has(skill)}
-              disabled={props.disabled}
-              t={t}
-              onMove={props.onMove}
-            />
-          ))
-        )}
+        <div style={memberBodyStyle}>
+          {folder.skills.length === 0 ? (
+            <span style={hintStyle}>{t('folder.empty')}</span>
+          ) : props.visibleSkills.length === 0 ? (
+            <span style={hintStyle}>{t('folder.noMatches')}</span>
+          ) : (
+            props.visibleSkills.map((skill) => (
+              <SkillChip
+                key={skill}
+                name={skill}
+                description={props.descriptions.get(skill)}
+                folder={folder.name}
+                folders={props.folderNames}
+                missing={props.loaded && !props.descriptions.has(skill)}
+                disabled={props.disabled}
+                t={t}
+                onMove={props.onMove}
+              />
+            ))
+          )}
+        </div>
       </div>
     </section>
   );

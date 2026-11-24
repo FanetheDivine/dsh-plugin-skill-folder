@@ -49,6 +49,7 @@ import {
   pageStyle,
   pageTitleStyle,
   primaryButtonStyle,
+  scrollbarStyleText,
   sectionHeaderStyle,
   sectionTitleStyle,
   srOnlyStyle,
@@ -352,6 +353,7 @@ export function FolderPage(props: FolderPageProps) {
     <SettingsForm labels={formLabels(t)} state={form} onSave={props.save} onDiscard={props.discard}>
       <div ref={rootRef} style={pageStyle} data-skill-folder-page>
         <style data-skill-folder-focus-styles>{focusStyleText}</style>
+        <style data-skill-folder-scrollbar-styles>{scrollbarStyleText}</style>
         <span style={srOnlyStyle} data-skill-folder-live role="status" aria-live="polite">
           {announcement}
         </span>
