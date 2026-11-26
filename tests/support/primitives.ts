@@ -5,7 +5,15 @@
  */
 
 export { Checkbox } from '@deepseek-ai/dsh-client-ui-primitives/src/Checkbox.tsx';
-export { IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives/src/icons/index.tsx';
+export {
+  IconChevronDownOutlineRegular,
+  IconDragHandleOutlineRegular,
+  IconFolderOpenOutlineRegular,
+  IconPlusOutlineRegular,
+  IconSearchOutlineRegular,
+  IconSparkleRegular,
+  IconTrashOutlineRegular,
+} from '@deepseek-ai/dsh-client-ui-primitives/src/icons/index.tsx';
 export type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives/src/Menu.tsx';
 export { Menu, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives/src/Menu.tsx';
 export { Switch } from '@deepseek-ai/dsh-client-ui-primitives/src/Switch.tsx';

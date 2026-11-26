@@ -98,6 +98,33 @@ export const sectionHeaderStyle: CSSProperties = {
   gap: 8,
 };
 
+/** 区块标题与徽标的组合。 */
+export const sectionTitleGroupStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  minWidth: 0,
+};
+
+/** 区块右侧操作区。 */
+export const sectionActionsStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+};
+
+/** 没有文件夹时的引导卡片。 */
+export const emptyFoldersStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '16px 14px',
+  border: '0.5px dashed var(--dsw-alias-border-l2)',
+  borderRadius: 10,
+  background: 'var(--dsw-alias-bg-layer-1)',
+  color: 'var(--dsw-alias-label-secondary)',
+};
+
 /** 区域计数与状态 badge。 */
 export const badgeStyle: CSSProperties = {
   display: 'inline-flex',
@@ -160,6 +187,10 @@ export const warnStyle: CSSProperties = {
 
 /** 次级按钮。 */
 export const buttonStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
   minHeight: 30,
   padding: '0 12px',
   border: '0.5px solid var(--dsw-alias-border-l2)',
@@ -196,8 +227,11 @@ export const iconButtonStyle: CSSProperties = {
   fontSize: 16,
 };
 
-/** 文字按钮，用于删除等低强调操作。 */
+/** 文字按钮，用于删除或批量折叠等低强调操作。 */
 export const textButtonStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
   height: 24,
   padding: '0 6px',
   border: 'none',
@@ -228,11 +262,34 @@ export const folderNameInputStyle: CSSProperties = {
   fontWeight: 600,
 };
 
+/** 带前置搜索图标的筛选输入外框。 */
+export const searchBoxStyle: CSSProperties = {
+  display: 'inline-flex',
+  flex: '1 1 180px',
+  alignItems: 'center',
+  gap: 6,
+  height: 30,
+  minWidth: 0,
+  padding: '0 9px',
+  border: '0.5px solid var(--dsw-alias-border-l2)',
+  borderRadius: 6,
+  background: 'var(--dsw-alias-bg-base)',
+  color: 'var(--dsw-alias-label-secondary)',
+  boxSizing: 'border-box',
+};
+
 /** 筛选输入框。 */
 export const filterInputStyle: CSSProperties = {
-  ...inputStyle,
-  flex: '1 1 140px',
+  flex: '1 1 120px',
   width: '100%',
+  minWidth: 0,
+  height: '100%',
+  padding: 0,
+  border: 'none',
+  outline: 'none',
+  background: 'transparent',
+  color: 'var(--dsw-alias-label-primary)',
+  fontSize: 12,
 };
 
 /** 非法输入框。 */
@@ -312,7 +369,9 @@ export const cardActionsStyle: CSSProperties = {
 
 /** 折叠箭头。 */
 export const collapseIconStyle: CSSProperties = {
-  display: 'inline-block',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   lineHeight: 1,
   transition: 'transform 120ms ease',
 };
@@ -384,10 +443,10 @@ export const dragHandleStyle: CSSProperties = {
 
 /** 拖拽手柄图标。 */
 export const dragIconStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
   flexShrink: 0,
   color: 'var(--dsw-alias-label-secondary)',
-  fontSize: 12,
-  letterSpacing: -2,
 };
 
 /** 仅供读屏播报的实时状态。 */
@@ -442,10 +501,11 @@ export const optionsGridStyle: CSSProperties = {
   paddingTop: 4,
 };
 
-/** 页面内控件的键盘焦点样式。 */
+/** 页面内控件的键盘焦点与悬停样式。 */
 export const focusStyleText = `
   [data-skill-folder-page] button:focus-visible,
-  [data-skill-folder-page] input:focus-visible,
+  [data-skill-folder-page] input:not([data-skill-filter-input]):focus-visible,
+  [data-skill-folder-page] [data-skill-search-box]:focus-within,
   [data-skill-folder-page] [data-skill-drag-handle]:focus-visible {
     outline: 2px solid var(--dsw-alias-brand-primary);
     outline-offset: 2px;
@@ -456,7 +516,10 @@ export const focusStyleText = `
     opacity: 0.55;
   }
   [data-skill-folder-page] [data-skill-move]:not(:disabled):hover,
-  [data-skill-folder-page] [data-skill-move][aria-expanded='true'] {
+  [data-skill-folder-page] [data-skill-move][aria-expanded='true'],
+  [data-skill-folder-page] [data-folder-collapse]:not(:disabled):hover,
+  [data-skill-folder-page] [data-folder-delete]:not(:disabled):hover,
+  [data-skill-folder-page] [data-folder-toggle-all]:not(:disabled):hover {
     background: var(--dsw-alias-interactive-bg-hover);
     color: var(--dsw-alias-label-primary);
   }
