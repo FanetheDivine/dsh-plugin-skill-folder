@@ -39,10 +39,10 @@ description: "Task list for feature 028-refine-config-ui"
 
 **Independent Test**: Render `FolderPage` with empty and non-empty folders, verify icons (`data-icon`), empty folder guidance (`data-folders-empty`), and batch collapse/expand helper functions (`allFoldersCollapsed`, `toggleAllFoldersCollapsed`).
 
-- [ ] T004 [P] [US1] Replace drag handle character with `IconDragHandleOutlineRegular` in `src/client/skill-chip.tsx`
-- [ ] T005 [P] [US1] Replace collapse chevron character with `IconChevronDownOutlineRegular` and add `IconTrashOutlineRegular` to the delete button in `src/client/folder-card.tsx`
-- [ ] T006 [US1] [US2] Implement `allFoldersCollapsed`, `toggleAllFoldersCollapsed`, empty folders guidance (`data-folders-empty`), batch toggle button (`data-folder-toggle-all`), and toolbar/search icons in `src/client/folder-page.tsx`
-- [ ] T007 [US1] [US2] [US3] Add unit tests for `allFoldersCollapsed`, `toggleAllFoldersCollapsed`, empty folder guidance, host icons, and bilingual rendering in `tests/client.test.ts`
+- [X] T004 [P] [US1] Replace drag handle character with `IconDragHandleOutlineRegular` in `src/client/skill-chip.tsx`
+- [X] T005 [P] [US1] Replace collapse chevron character with `IconChevronDownOutlineRegular` and add `IconTrashOutlineRegular` to the delete button in `src/client/folder-card.tsx`
+- [X] T006 [US1] [US2] Implement `allFoldersCollapsed`, `toggleAllFoldersCollapsed`, empty folders guidance (`data-folders-empty`), batch toggle button (`data-folder-toggle-all`), and toolbar/search icons in `src/client/folder-page.tsx`
+- [X] T007 [US1] [US2] [US3] Add unit tests for `allFoldersCollapsed`, `toggleAllFoldersCollapsed`, empty folder guidance, host icons, and bilingual rendering in `tests/client.test.ts`
 
 **Checkpoint**: User Stories 1, 2, and 3 are functional and verified by `pnpm check`.
 

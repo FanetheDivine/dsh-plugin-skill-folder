@@ -11,10 +11,12 @@ import { autoGroup as autoGroupFolders } from '../src/auto-group.ts';
 import { parseSkillsPayload } from '../src/client/api.ts';
 import { type FolderFormState, ROW_ID, ROW_KEY } from '../src/client/folder-form.ts';
 import {
+  allFoldersCollapsed,
   collapsedAfterRemoval,
   effectiveFolderCollapsed,
   FolderPage,
   filterSkillNames,
+  toggleAllFoldersCollapsed,
 } from '../src/client/folder-page.tsx';
 import * as clientEntry from '../src/client/index.ts';
 import { en, NS, zh } from '../src/client/locales.ts';
@@ -294,9 +296,46 @@ describe('配置页渲染', () => {
   it('只读时禁用编辑控件与保存', () => {
     const html = renderPage('page', zh, pageState({ writable: false }));
     expect(html).toContain('此部署以只读方式保存设置。');
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>新建文件夹/);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*?新建文件夹/);
     expect(html).toMatch(/<input[^>]*aria-label="文件夹名称"[^>]*disabled/);
     expect(html).toMatch(/<button[^>]*disabled[^>]*>保存/);
+  });
+
+  it('有文件夹时渲染全部折叠按钮与宿主矢量图标', () => {
+    const html = renderPage('page', zh);
+    expect(html).toContain('data-folder-toggle-all');
+    expect(html).toContain('全部折叠');
+    expect(html).toContain('data-icon="dsw-icon-plus-outline-regular"');
+    expect(html).toContain('data-icon="dsw-icon-sparkle-regular"');
+    expect(html).toContain('data-icon="dsw-icon-search-outline-regular"');
+    expect(html).toContain('data-icon="dsw-icon-drag-handle-outline-regular"');
+    expect(html).toContain('data-icon="dsw-icon-trash-outline-regular"');
+    expect(html).not.toContain('data-folders-empty');
+  });
+
+  it('没有文件夹时渲染空状态引导且不渲染批量折叠按钮', () => {
+    const html = renderPage(
+      'page',
+      zh,
+      pageState({
+        folders: { text: '[]', overridden: true, invalid: false },
+      }),
+    );
+    expect(html).toContain('data-folders-empty');
+    expect(html).toContain(
+      '还没有文件夹。点击上方「新建文件夹」或「按前缀自动分组」开始整理技能。',
+    );
+    expect(html).not.toContain('data-folder-toggle-all="true"');
+    expect(html).not.toContain('全部折叠');
+    expect(html).not.toContain('全部展开');
+    const enHtml = renderPage(
+      'page',
+      en,
+      pageState({
+        folders: { text: '[]', overridden: true, invalid: false },
+      }),
+    );
+    expect(enHtml).toContain('No folders yet.');
   });
 
   it('数量越界时显示字段错误并阻止保存', () => {
@@ -476,6 +515,14 @@ describe('配置页临时视图状态', () => {
     expect([...collapsedAfterRemoval(new Set([1, 3]), 1)]).toEqual([2]);
     expect([...collapsedAfterRemoval(new Set([0, 2]), 0)]).toEqual([1]);
     expect([...collapsedAfterRemoval(new Set([0, 1]), 3)]).toEqual([0, 1]);
+  });
+
+  it('全部折叠与全部展开在文件夹集合上互逆切换', () => {
+    expect(allFoldersCollapsed(0, new Set())).toBe(false);
+    expect(allFoldersCollapsed(2, new Set([0]))).toBe(false);
+    expect(allFoldersCollapsed(2, new Set([0, 1]))).toBe(true);
+    expect([...toggleAllFoldersCollapsed(2, new Set([0]))]).toEqual([0, 1]);
+    expect([...toggleAllFoldersCollapsed(2, new Set([0, 1]))]).toEqual([]);
   });
 });
 
