@@ -52,9 +52,9 @@ description: "Task list for feature 028-refine-config-ui"
 
 **Purpose**: Update user documentation, changelog, and run full verification gates.
 
-- [ ] T008 [P] Update usage table in `README.md` with batch collapse/expand description
-- [ ] T009 [P] Add change entry in `CHANGELOG.md`
-- [ ] T010 Run `pnpm format && pnpm full-check` to validate all code and dist tests
+- [X] T008 [P] Update usage table in `README.md` with batch collapse/expand description
+- [X] T009 [P] Add change entry in `CHANGELOG.md`
+- [X] T010 Run `pnpm format && pnpm full-check` to validate all code and dist tests
 
 ---
 
