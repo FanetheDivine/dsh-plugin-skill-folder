@@ -402,6 +402,45 @@ describe('目录去重接线', () => {
     expect(result.messages).toEqual([otherMessage]);
   });
 
+  it('目录变化时注入一次更新，变化后的重复被丢弃', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const initial = await foldOnce(ctx);
+    ctx.snapshot = async () => ({
+      skills: [
+        ...ctx.skillsFixture,
+        {
+          name: 'new-skill',
+          description: '新技能',
+          invocation: { modelInvocable: true, userInvocable: true },
+          source: 'user-agents',
+        },
+      ],
+      complete: true,
+    });
+    const changedCatalog = {
+      ...ctx.catalog,
+      id: 'catalog-2',
+      source: {
+        ...ctx.catalog.source,
+        update: true as const,
+        entries: [...ctx.catalog.source.entries, { name: 'new-skill', description: '新技能' }],
+      },
+    };
+    const updated = (await ctx._runPreStep(
+      { agent: agentWith([presentedMessage(initial)]) },
+      async () => ({ kind: 'enter' as const, messages: [changedCatalog] }),
+    )) as { messages: { content: { text?: string }[] }[] };
+    const updatedText = updated.messages[0]?.content[0]?.text ?? '';
+    expect(updatedText).toContain('The available skill catalog changed.');
+    expect(updatedText).toContain('`new-skill`');
+    const repeated = (await ctx._runPreStep(
+      { agent: agentWith([presentedMessage(initial), presentedMessage(updatedText)]) },
+      async () => ({ kind: 'enter' as const, messages: [changedCatalog] }),
+    )) as { messages: unknown[] };
+    expect(repeated.messages).toEqual([]);
+  });
+
   it('已呈现内容不同时注入折叠目录', async () => {
     const ctx = makePluginCtx();
     apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });

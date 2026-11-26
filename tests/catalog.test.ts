@@ -359,4 +359,51 @@ describe('折叠模型目录', () => {
       presentedBodyOf([{ role: 'user', source: { kind: 'skill-catalog' }, content: 'oops' }]),
     ).toBeUndefined();
   });
+
+  it('文件夹摘要变化视为正文变化', () => {
+    const [folded] = foldCatalog([catalogMessage(['lark-doc'])], {
+      skills,
+      folders,
+      toolVisible: true,
+    });
+    const presented = catalogBody(textOf(folded));
+    const [changed] = foldCatalog([catalogMessage(['lark-doc'])], {
+      skills,
+      folders: [{ name: 'lark', description: '飞书工具（新）', skills: ['lark-doc'] }],
+      toolVisible: true,
+      presented,
+    });
+    expect(textOf(changed)).toContain('飞书工具（新）');
+    expect(textOf(changed)).toContain('<skill_folders>');
+  });
+
+  it('正文变化后再次相同则丢弃', () => {
+    const options = { skills, folders, toolVisible: true };
+    const [first] = foldCatalog([catalogMessage(['lark-doc', 'chrome-devtools'])], options);
+    const firstBody = catalogBody(textOf(first));
+    const [second] = foldCatalog([catalogMessage(['lark-doc'])], {
+      ...options,
+      presented: firstBody,
+    });
+    const secondBody = catalogBody(textOf(second));
+    expect(secondBody).not.toBe(firstBody);
+    const third = foldCatalog([catalogMessage(['lark-doc'])], {
+      ...options,
+      presented: secondBody,
+    });
+    expect(third).toEqual([]);
+  });
+
+  it('更新首句只在正文变化那一步出现', () => {
+    const options = { skills, folders, toolVisible: true };
+    const [initial] = foldCatalog([catalogMessage(['lark-doc'])], options);
+    expect(textOf(initial)).toContain('The following skills are available in this session.');
+    const original = catalogMessage(['lark-doc', 'chrome-devtools']);
+    const updating = { ...original, source: { ...original.source, update: true as const } };
+    const [changed] = foldCatalog([updating], {
+      ...options,
+      presented: catalogBody(textOf(initial)),
+    });
+    expect(textOf(changed)).toContain('The available skill catalog changed.');
+  });
 });
