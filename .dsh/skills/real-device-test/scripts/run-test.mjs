@@ -411,7 +411,12 @@ try {
   });
 
   await check('B9 目录抖动时每轮只注入一份目录', async () => {
-    await config();
+    const [chosen] = state.chosen;
+    if (chosen === undefined) {
+      skip('B9 目录抖动时每轮只注入一份目录', '宿主里没有可折叠的全局技能');
+      return undefined;
+    }
+    await config({ folders: [{ name: 'rdt-dedupe', description: '实机测试', skills: [chosen] }] });
     const registry = app.get('skills');
     assert(registry && typeof registry.registerProvider === 'function', '缺少 registerProvider');
     // 抖动 provider：发现完整性在轮次之间翻转，等价于缺陷的触发条件

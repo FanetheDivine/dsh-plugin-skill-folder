@@ -42,6 +42,11 @@ pnpm format && pnpm check && pnpm build
 
 修复前的对照：同一驱动脚本下每轮新增 1 条目录事件，多轮后事件条数等于轮数。
 
+## 实测记录（2026-11-26，宿主 0.2.2-rc.5，profile `rdt-029`）
+
+- 修复后：`B9` 连续 5 轮，抖动 provider 调用 10 次，会话 `skill-catalog` 事件 1 条，每轮请求折叠目录块 1 份，没有出现「The available skill catalog changed.」首句；`RDT_DONE {"pass":11,"fail":0,"skip":0}`。
+- 修复前：把 `src/catalog.ts` 与 `src/index.ts` 临时回退到 `2e2ce76` 并重新构建，同一用例在第二轮失败，请求里出现 2 份目录。说明该用例覆盖缺陷路径。
+
 ## 4. 回归确认
 
 - 未配置文件夹的会话：目录保持原生文本，无 `foldedBy`。
