@@ -1,6 +1,6 @@
 // 目录折叠测试：折叠文本、未归组逐项展示、空文件夹、保持原样与 source 不变。
 import { describe, expect, it } from 'vitest';
-import { foldCatalog, type SkillCatalogMessage } from '../src/catalog.ts';
+import { catalogBody, foldCatalog, type SkillCatalogMessage } from '../src/catalog.ts';
 import type { FolderConfig } from '../src/config.ts';
 import type { SkillSummary } from '../src/skills.ts';
 
@@ -175,5 +175,81 @@ describe('折叠模型目录', () => {
     expect(text).toContain('<skill_folders>');
     expect(text).toContain('`skill_search`');
     expect(text).toContain('`skill`');
+  });
+
+  it('折叠文本逐字节稳定', () => {
+    const [folded] = foldCatalog([catalogMessage(['lark-doc', 'lark-sheet', 'chrome-devtools'])], {
+      skills,
+      folders,
+      toolVisible: true,
+    });
+    expect(textOf(folded)).toBe(
+      [
+        '<system-reminder>',
+        'The following skills are available in this session. Folders group their members.',
+        '',
+        '<available_skills>',
+        '- `chrome-devtools`: chrome-devtools 的描述',
+        '</available_skills>',
+        '',
+        '<skill_folders>',
+        '- `lark` (2 skills): 飞书工具',
+        '</skill_folders>',
+        '',
+        'Skills inside a folder stay loadable. To find one, call `skill_search` with the folder name or with capability keywords, then load the chosen skill with `skill`. Load a listed skill directly when its description matches the task.',
+        '</system-reminder>',
+      ].join('\n'),
+    );
+  });
+
+  it('宿主标记更新时首句改为已变化', () => {
+    const original = catalogMessage(['lark-doc']);
+    const updating = { ...original, source: { ...original.source, update: true as const } };
+    const [folded] = foldCatalog([updating], { skills, folders, toolVisible: true });
+    expect(textOf(folded)).toContain(
+      'The available skill catalog changed. Folders below replace their members; the skills listed above stay available.',
+    );
+    expect(textOf(folded)).not.toContain('The following skills are available in this session.');
+  });
+
+  it('catalogBody 从折叠文本截出正文，不含首句', () => {
+    const [folded] = foldCatalog([catalogMessage(['lark-doc', 'chrome-devtools'])], {
+      skills,
+      folders,
+      toolVisible: true,
+    });
+    const body = catalogBody(textOf(folded));
+    expect(body?.startsWith('<available_skills>')).toBe(true);
+    expect(body?.endsWith('matches the task.')).toBe(true);
+    expect(body).not.toContain('The following skills are available');
+  });
+
+  it('catalogBody 从原生目录文本截出正文', () => {
+    const native = [
+      '<system-reminder>',
+      'The following skills are available in this session.',
+      '',
+      '<available_skills>',
+      '- `lark-doc`: 飞书文档',
+      '</available_skills>',
+      '',
+      'Load a skill before acting.',
+      '</system-reminder>',
+    ].join('\n');
+    const body = catalogBody(native);
+    expect(body).toBe(
+      [
+        '<available_skills>',
+        '- `lark-doc`: 飞书文档',
+        '</available_skills>',
+        '',
+        'Load a skill before acting.',
+      ].join('\n'),
+    );
+  });
+
+  it('catalogBody 找不到正文标记时返回 undefined', () => {
+    expect(catalogBody('普通消息')).toBeUndefined();
+    expect(catalogBody('')).toBeUndefined();
   });
 });

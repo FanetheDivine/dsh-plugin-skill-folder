@@ -1,6 +1,6 @@
 /**
  * 目录折叠：把原生技能目录消息改写为「未归组条目 + 文件夹摘要」。
- * 导出 SkillCatalogMessage、foldedMessage 与 foldCatalog。
+ * 导出 SkillCatalogMessage、catalogBody、foldedMessage 与 foldCatalog。
  */
 import type { FolderConfig } from './config.ts';
 import { FOLDED_BY } from './constants.ts';
@@ -99,16 +99,29 @@ function escapeText(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
-/** 渲染折叠后的目录正文。 */
-function renderCatalog(
+/** 目录正文的起始标记。 */
+const BODY_START = '<available_skills>';
+
+/** 目录消息的结束标记。 */
+const REMINDER_END = '</system-reminder>';
+
+/** 正文末尾的固定加载指引。 */
+const LOAD_HINT =
+  'Skills inside a folder stay loadable. To find one, call `skill_search` with the folder name or with capability keywords, then load the chosen skill with `skill`. Load a listed skill directly when its description matches the task.';
+
+/** 渲染目录首句：跟随宿主的更新标记。 */
+function renderHeader(update: boolean): string {
+  return update
+    ? 'The available skill catalog changed. Folders below replace their members; the skills listed above stay available.'
+    : 'The following skills are available in this session. Folders group their members.';
+}
+
+/** 渲染目录正文：未折叠条目与文件夹摘要，不含首句。 */
+function renderBody(
   visible: readonly string[],
   summaries: readonly { name: string; description: string; count: number }[],
   message: SkillCatalogMessage,
 ): string {
-  const header =
-    message.source['update'] === true
-      ? 'The available skill catalog changed. Folders below replace their members; the skills listed above stay available.'
-      : 'The following skills are available in this session. Folders group their members.';
   const folderLines = summaries.map(
     (folder) =>
       `- \`${folder.name}\` (${folder.count} skills)${
@@ -116,10 +129,7 @@ function renderCatalog(
       }`,
   );
   return [
-    '<system-reminder>',
-    header,
-    '',
-    '<available_skills>',
+    BODY_START,
     ...visible.map((name) => `- \`${name}\`: ${escapeText(descriptionOf(name, message))}`),
     '</available_skills>',
     '',
@@ -127,9 +137,28 @@ function renderCatalog(
     ...folderLines,
     '</skill_folders>',
     '',
-    'Skills inside a folder stay loadable. To find one, call `skill_search` with the folder name or with capability keywords, then load the chosen skill with `skill`. Load a listed skill directly when its description matches the task.',
-    '</system-reminder>',
+    LOAD_HINT,
   ].join('\n');
+}
+
+/** 渲染折叠后的目录文本。 */
+function renderCatalog(
+  visible: readonly string[],
+  summaries: readonly { name: string; description: string; count: number }[],
+  message: SkillCatalogMessage,
+): string {
+  const header = renderHeader(message.source['update'] === true);
+  const body = renderBody(visible, summaries, message);
+  return ['<system-reminder>', header, '', body, REMINDER_END].join('\n');
+}
+
+/** 从目录文本里截取正文；找不到起始标记时返回 undefined。 */
+export function catalogBody(text: string): string | undefined {
+  const start = text.indexOf(BODY_START);
+  if (start < 0) return undefined;
+  const tail = text.slice(start);
+  const end = tail.indexOf(REMINDER_END);
+  return (end < 0 ? tail : tail.slice(0, end)).trimEnd();
 }
 
 /** 原生条目描述，找不到时返回空串。 */
