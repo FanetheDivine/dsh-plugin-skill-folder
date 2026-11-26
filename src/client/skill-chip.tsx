@@ -4,7 +4,11 @@
  */
 
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives';
-import { IconChevronDownOutlineRegular, Menu } from '@deepseek-ai/dsh-client-ui-primitives';
+import {
+  IconChevronDownOutlineRegular,
+  IconDragHandleOutlineRegular,
+  Menu,
+} from '@deepseek-ai/dsh-client-ui-primitives';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import { useDraggable } from '@dnd-kit/core';
 import { useState } from 'react';
@@ -135,7 +139,7 @@ export function SkillChip(props: SkillChipProps) {
         {...attributes}
       >
         <span aria-hidden="true" style={dragIconStyle}>
-          ⠿
+          <IconDragHandleOutlineRegular size={12} />
         </span>
         <span style={{ ...chipNameStyle, minWidth: 0 }}>{props.name}</span>
       </button>

@@ -3,6 +3,10 @@
  * 导出 FolderCard、folderDropId 与其 props。
  */
 
+import {
+  IconChevronDownOutlineRegular,
+  IconTrashOutlineRegular,
+} from '@deepseek-ai/dsh-client-ui-primitives';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import { useDroppable } from '@dnd-kit/core';
 import { useId } from 'react';
@@ -109,6 +113,7 @@ export function FolderCard(props: FolderCardProps) {
           <button
             type="button"
             style={iconButtonStyle}
+            data-folder-collapse={folder.name}
             aria-label={t(props.collapsed ? 'folder.expand' : 'folder.collapse', {
               name: folder.name || t('folder.name'),
             })}
@@ -125,7 +130,7 @@ export function FolderCard(props: FolderCardProps) {
                 transform: props.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
               }}
             >
-              ▾
+              <IconChevronDownOutlineRegular size={14} />
             </span>
           </button>
           <input
@@ -158,12 +163,14 @@ export function FolderCard(props: FolderCardProps) {
             <button
               type="button"
               style={textButtonStyle}
+              data-folder-delete={folder.name}
               disabled={props.disabled}
               onClick={() => {
                 props.onRemove(index);
               }}
             >
-              {t('folder.delete')}
+              <IconTrashOutlineRegular size={12} />
+              <span>{t('folder.delete')}</span>
             </button>
           </div>
         </div>

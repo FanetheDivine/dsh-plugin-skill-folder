@@ -7,7 +7,15 @@
 // Type-only：拉取 plugins.row.config 槽位声明。
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
 import type { SettingsFormLabels } from '@deepseek-ai/dsh-client-ui-primitives';
-import { Checkbox, SettingsForm, SettingsValueField } from '@deepseek-ai/dsh-client-ui-primitives';
+import {
+  Checkbox,
+  IconFolderOpenOutlineRegular,
+  IconPlusOutlineRegular,
+  IconSearchOutlineRegular,
+  IconSparkleRegular,
+  SettingsForm,
+  SettingsValueField,
+} from '@deepseek-ai/dsh-client-ui-primitives';
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import {
   DndContext,
@@ -35,6 +43,7 @@ import {
   cardStyle,
   chipListStyle,
   dividerStyle,
+  emptyFoldersStyle,
   errorStyle,
   filterGroupStyle,
   filterInputStyle,
@@ -49,10 +58,14 @@ import {
   pageTitleStyle,
   primaryButtonStyle,
   scrollbarStyleText,
+  searchBoxStyle,
+  sectionActionsStyle,
   sectionHeaderStyle,
+  sectionTitleGroupStyle,
   sectionTitleStyle,
   srOnlyStyle,
   statusStyle,
+  textButtonStyle,
   toolbarActionsStyle,
   toolbarStyle,
   warnStyle,
@@ -163,6 +176,28 @@ export function effectiveFolderCollapsed(
   visibleCount: number,
 ): boolean {
   return collapsed && (!filterActive || visibleCount === 0);
+}
+
+/** 判断全部文件夹是否都处于折叠状态。 */
+export function allFoldersCollapsed(folderCount: number, collapsed: ReadonlySet<number>): boolean {
+  if (folderCount <= 0) return false;
+  for (let index = 0; index < folderCount; index += 1) {
+    if (!collapsed.has(index)) return false;
+  }
+  return true;
+}
+
+/** 切换全部文件夹的折叠与展开：全部已折叠时展开，否则全部折叠。 */
+export function toggleAllFoldersCollapsed(
+  folderCount: number,
+  collapsed: ReadonlySet<number>,
+): Set<number> {
+  if (allFoldersCollapsed(folderCount, collapsed)) return new Set();
+  const next = new Set<number>();
+  for (let index = 0; index < folderCount; index += 1) {
+    next.add(index);
+  }
+  return next;
 }
 
 /** 未分组区域为空时的提示：列表未就绪时不下「全部已分组」的结论。 */
@@ -280,6 +315,10 @@ export function FolderPage(props: FolderPageProps) {
   const visibleCount =
     visibleFolderSkills.reduce((count, names) => count + names.length, 0) + ungrouped.length;
   const filterActive = filter.trim() !== '';
+  const allCollapsed = useMemo(
+    () => allFoldersCollapsed(folders.length, collapsed),
+    [folders.length, collapsed],
+  );
 
   const { moveSkill, removeFolder } = props;
   const onMoveSkill = useCallback(
@@ -372,7 +411,8 @@ export function FolderPage(props: FolderPageProps) {
                 setPendingFocus({ type: 'folder', index: folders.length });
               }}
             >
-              {t('folder.create')}
+              <IconPlusOutlineRegular size={14} />
+              <span>{t('folder.create')}</span>
             </button>
             <button
               type="button"
@@ -388,7 +428,8 @@ export function FolderPage(props: FolderPageProps) {
                 );
               }}
             >
-              {t('autoGroup.label')}
+              <IconSparkleRegular size={14} />
+              <span>{t('autoGroup.label')}</span>
             </button>
             <Checkbox
               label={t('autoGroup.always.label')}
@@ -411,20 +452,24 @@ export function FolderPage(props: FolderPageProps) {
             ) : null}
           </div>
           <div style={filterGroupStyle}>
-            <input
-              ref={filterRef}
-              type="search"
-              aria-label={t('filter.label')}
-              aria-describedby={`${id}-filter-count`}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={t('filter.placeholder')}
-              style={filterInputStyle}
-              value={filter}
-              onChange={(event) => {
-                setFilter(event.target.value);
-              }}
-            />
+            <span style={searchBoxStyle} data-skill-search-box>
+              <IconSearchOutlineRegular size={14} />
+              <input
+                ref={filterRef}
+                type="search"
+                data-skill-filter-input
+                aria-label={t('filter.label')}
+                aria-describedby={`${id}-filter-count`}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={t('filter.placeholder')}
+                style={filterInputStyle}
+                value={filter}
+                onChange={(event) => {
+                  setFilter(event.target.value);
+                }}
+              />
+            </span>
             <span id={`${id}-filter-count`} style={badgeStyle} role="status" aria-live="polite">
               {filterActive
                 ? t('filter.results', {
@@ -479,37 +524,60 @@ export function FolderPage(props: FolderPageProps) {
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           <section style={folderSectionStyle} aria-label={t('page.folders')}>
             <div style={sectionHeaderStyle}>
-              <h3 style={sectionTitleStyle}>{t('page.folders')}</h3>
-              <span style={badgeStyle}>{String(folders.length)}</span>
+              <div style={sectionTitleGroupStyle}>
+                <h3 style={sectionTitleStyle}>{t('page.folders')}</h3>
+                <span style={badgeStyle}>{String(folders.length)}</span>
+              </div>
+              {folders.length > 0 ? (
+                <div style={sectionActionsStyle}>
+                  <button
+                    type="button"
+                    style={textButtonStyle}
+                    data-folder-toggle-all
+                    onClick={() => {
+                      setCollapsed((current) => toggleAllFoldersCollapsed(folders.length, current));
+                    }}
+                  >
+                    {t(allCollapsed ? 'folder.expandAll' : 'folder.collapseAll')}
+                  </button>
+                </div>
+              ) : null}
             </div>
-            <div style={folderGridStyle} data-skill-folder-grid>
-              {folders.map((folder, index) => (
-                <FolderCard
-                  // 下标稳定：名称编辑时卡片不重建，输入框保持焦点
-                  key={folderDropId(index)}
-                  index={index}
-                  folder={folder}
-                  visibleSkills={visibleFolderSkills[index] ?? []}
-                  collapsed={effectiveFolderCollapsed(
-                    collapsed.has(index),
-                    filterActive,
-                    visibleFolderSkills[index]?.length ?? 0,
-                  )}
-                  filterActive={filterActive}
-                  folderNames={folderNames}
-                  descriptions={descriptions}
-                  loaded={skillsState.status === 'ready'}
-                  errors={errors.filter((error) => error.index === index)}
-                  disabled={disabled}
-                  t={t}
-                  onRename={props.renameFolder}
-                  onDescribe={props.describeFolder}
-                  onRemove={onRemoveFolder}
-                  onToggle={toggleCollapsed}
-                  onMove={onMoveSkill}
-                />
-              ))}
-            </div>
+            {folders.length === 0 ? (
+              <div style={emptyFoldersStyle} data-folders-empty>
+                <IconFolderOpenOutlineRegular size={16} />
+                <span style={hintStyle}>{t('folder.emptyList')}</span>
+              </div>
+            ) : (
+              <div style={folderGridStyle} data-skill-folder-grid>
+                {folders.map((folder, index) => (
+                  <FolderCard
+                    // 下标稳定：名称编辑时卡片不重建，输入框保持焦点
+                    key={folderDropId(index)}
+                    index={index}
+                    folder={folder}
+                    visibleSkills={visibleFolderSkills[index] ?? []}
+                    collapsed={effectiveFolderCollapsed(
+                      collapsed.has(index),
+                      filterActive,
+                      visibleFolderSkills[index]?.length ?? 0,
+                    )}
+                    filterActive={filterActive}
+                    folderNames={folderNames}
+                    descriptions={descriptions}
+                    loaded={skillsState.status === 'ready'}
+                    errors={errors.filter((error) => error.index === index)}
+                    disabled={disabled}
+                    t={t}
+                    onRename={props.renameFolder}
+                    onDescribe={props.describeFolder}
+                    onRemove={onRemoveFolder}
+                    onToggle={toggleCollapsed}
+                    onMove={onMoveSkill}
+                  />
+                ))}
+              </div>
+            )}
           </section>
           <UngroupedArea
             names={ungrouped}
