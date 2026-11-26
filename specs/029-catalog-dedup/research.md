@@ -20,10 +20,15 @@
 | 方案 | 否掉原因 |
 | --- | --- |
 | `eventAt` / `snapshotEvents` / `ownEvents` | 标注「新调用禁止」；宿主自己的目录监听仍在用，新代码不跟 |
+| `surface.nodes` 配 `eventAt` | 同上，取正文仍要 deprecated 读取 |
+| `ctx.sessions.get(id)` 再调 `deriveMessages()` | 多一次会话查找，拿不到比 `agent.session` 更多的东西 |
+| `sessionQuery` 服务 | 全异步、面向冷会话查询，单步内多一层跨服务调用 |
+| `sessionProjections.stateOf()` | 同步但需要注册 projection 单元，机制过重 |
 | 插件按 Agent 缓存上次正文 | 进程重启、会话分叉、上下文压缩后不可靠；压缩把目录块移出可见面时会漏注入 |
-| `sessionQuery` 服务 / 会话查询工具 | 面向查询与工具调用，异步且需额外注入，单步内多一层跨服务调用 |
 
 **风险**：`deriveMessages()` 属于宿主 `Session` 类的方法，不是服务接口；宿主升级可能改名。写入 `docs/known-risks.md`，并在调用处做能力检测（缺失时按未知处理）。
+
+**调用条件**：无前置条件，pre-step 内读到的是已提交历史（本步消息在 step admission 之后才 append）。单线程同步方法，无异步交叠；每次返回新数组，元素共享且深冻结，调用方污染不到日志。
 
 ## R-002 识别「已呈现的目录」
 
@@ -59,6 +64,8 @@
 **决定**：读取、解析、比较整段包在 `try` 内；异常、`session` 缺失、`deriveMessages` 不存在、消息结构异常、没有目录记录，一律按「未呈现」处理，正常注入并计入日志（warn）。
 
 **理由**：spec FR-009；判定是优化，不能成为新故障点。
+
+**已知抛错面**：`deriveMessages()` 只在两种情况下抛错——某个已应用的 message projection 定义被移除或替换，或读取表面时折叠增量事件失败。本插件不注册 projection，第一种风险很低；两种都被 `try` 覆盖。
 
 ## R-006 渲染文本保持逐字节兼容
 
