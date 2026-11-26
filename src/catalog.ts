@@ -1,6 +1,6 @@
 /**
  * 目录折叠：把原生技能目录消息改写为「未归组条目 + 文件夹摘要」。
- * 导出 SkillCatalogMessage、catalogBody、foldedMessage 与 foldCatalog。
+ * 导出 SkillCatalogMessage、catalogBody、presentedBodyOf、foldMessage 与 foldCatalog。
  */
 import type { FolderConfig } from './config.ts';
 import { FOLDED_BY } from './constants.ts';
@@ -47,6 +47,8 @@ export interface FoldContext {
   folders: readonly FolderConfig[];
   /** 本 Agent 是否看得到 `skill_search`。 */
   toolVisible: boolean;
+  /** 本会话已呈现的最后一份目录正文；`undefined` 表示未知。 */
+  presented?: string | undefined;
 }
 
 /** 判断消息是否是原生技能目录。 */
@@ -62,12 +64,14 @@ function catalogNames(message: SkillCatalogMessage): string[] {
   return message.source.entries.map((entry) => entry.name);
 }
 
-/** 折叠一个目录消息；没有可折叠条目时返回原对象。 */
-export function foldedMessage(
-  message: SkillCatalogMessage,
-  context: FoldContext,
-): SkillCatalogMessage {
-  if (!context.toolVisible) return message;
+/** 折叠一条目录消息的结果。 */
+export type FoldOutcome =
+  | { readonly action: 'keep'; readonly message: SkillCatalogMessage }
+  | { readonly action: 'drop' };
+
+/** 折叠一条目录消息；正文与本会话已呈现的那份相同时判定为丢弃。 */
+export function foldMessage(message: SkillCatalogMessage, context: FoldContext): FoldOutcome {
+  if (!context.toolVisible) return { action: 'keep', message };
   const byName = new Map(context.skills.map((skill) => [skill.name, skill]));
   const globalSkills = context.skills.filter((skill) => isGlobalSummary(skill, context.skills));
   const globalNames = new Set(globalSkills.map((skill) => skill.name));
@@ -78,7 +82,7 @@ export function foldedMessage(
   const present = catalogNames(message);
   const folded = present.filter((name) => foldedNames.has(name) && byName.has(name));
   // 没有条目被折叠时保持原消息：原生目录逐字节不变
-  if (folded.length === 0) return message;
+  if (folded.length === 0) return { action: 'keep', message };
   const visible = present.filter((name) => !foldedNames.has(name));
   const summaries = describeFolders(
     context.folders.map((folder) => ({
@@ -86,11 +90,17 @@ export function foldedMessage(
       skills: folder.skills.filter((skill) => folded.includes(skill)),
     })),
   );
-  const text = renderCatalog(visible, summaries, message);
+  const body = renderBody(visible, summaries, message);
+  // 正文已呈现过：丢弃这条重发，会话里那份保持不动
+  if (context.presented !== undefined && context.presented === body) return { action: 'drop' };
+  const text = renderCatalog(renderHeader(message.source['update'] === true), body);
   return {
-    ...message,
-    content: [{ type: 'text', text }],
-    source: { ...message.source, foldedBy: FOLDED_BY },
+    action: 'keep',
+    message: {
+      ...message,
+      content: [{ type: 'text', text }],
+      source: { ...message.source, foldedBy: FOLDED_BY },
+    },
   };
 }
 
@@ -141,14 +151,8 @@ function renderBody(
   ].join('\n');
 }
 
-/** 渲染折叠后的目录文本。 */
-function renderCatalog(
-  visible: readonly string[],
-  summaries: readonly { name: string; description: string; count: number }[],
-  message: SkillCatalogMessage,
-): string {
-  const header = renderHeader(message.source['update'] === true);
-  const body = renderBody(visible, summaries, message);
+/** 用首句与正文拼出目录文本。 */
+function renderCatalog(header: string, body: string): string {
   return ['<system-reminder>', header, '', body, REMINDER_END].join('\n');
 }
 
@@ -166,12 +170,50 @@ function descriptionOf(name: string, message: SkillCatalogMessage): string {
   return message.source.entries.find((entry) => entry.name === name)?.description ?? '';
 }
 
-/** 折叠消息列表中的目录消息，其余消息原样返回。 */
+/** 折叠消息列表中的目录消息；判定为丢弃的目录消息移出列表，其余消息原样保留。 */
 export function foldCatalog<T extends CatalogMessageBase>(
   messages: readonly T[],
   context: FoldContext,
 ): T[] {
-  return messages.map((message) =>
-    isSkillCatalogMessage(message) ? (foldedMessage(message, context) as unknown as T) : message,
-  );
+  const result: T[] = [];
+  for (const message of messages) {
+    if (!isSkillCatalogMessage(message)) {
+      result.push(message);
+      continue;
+    }
+    const outcome = foldMessage(message, context);
+    if (outcome.action === 'keep') result.push(outcome.message as unknown as T);
+  }
+  return result;
+}
+
+/** 读取一条消息里的文本；不是目录消息时返回 undefined。 */
+function catalogTextOf(message: unknown): string | undefined {
+  if (typeof message !== 'object' || message === null) return undefined;
+  const { role, source, content } = message as {
+    role?: unknown;
+    source?: unknown;
+    content?: unknown;
+  };
+  if (role !== 'user') return undefined;
+  if (typeof source !== 'object' || source === null) return undefined;
+  if ((source as { kind?: unknown }).kind !== 'skill-catalog') return undefined;
+  if (!Array.isArray(content)) return undefined;
+  const parts: string[] = [];
+  for (const block of content as readonly unknown[]) {
+    if (typeof block !== 'object' || block === null) continue;
+    const { type, text } = block as { type?: unknown; text?: unknown };
+    if (type === 'text' && typeof text === 'string') parts.push(text);
+  }
+  return parts.join('\n');
+}
+
+/** 从模型可见消息里取最后一份目录的正文；不可得时返回 undefined。 */
+export function presentedBodyOf(messages: readonly unknown[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const text = catalogTextOf(messages[index]);
+    if (text === undefined) continue;
+    return catalogBody(text);
+  }
+  return undefined;
 }
