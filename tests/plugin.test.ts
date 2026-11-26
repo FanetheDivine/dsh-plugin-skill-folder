@@ -453,4 +453,53 @@ describe('目录去重接线', () => {
     expect(text).toContain('<skill_folders>');
     expect(text).toContain('`lark` (1 skills): 飞书');
   });
+
+  it('读取会话可见记录抛错时照常注入并记录警告', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const agent = {
+      id: 'a',
+      session: {
+        deriveMessages: () => {
+          throw new Error('boom');
+        },
+      },
+    };
+    const result = (await ctx._runPreStep({ agent }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(result.messages[0]?.content[0]?.text).toContain('<skill_folders>');
+    expect(
+      ctx._loggerCalls.some(
+        (call) => call.level === 'warn' && String(call.args[0]).includes('presented catalog'),
+      ),
+    ).toBe(true);
+  });
+
+  it('agent 没有会话读取面时按首次注入', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const result = (await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(result.messages[0]?.content[0]?.text).toContain('<skill_folders>');
+    expect(
+      ctx._loggerCalls.some(
+        (call) => call.level === 'warn' && String(call.args[0]).includes('presented catalog'),
+      ),
+    ).toBe(true);
+  });
+
+  it('会话里没有目录消息时按首次注入', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const result = (await ctx._runPreStep({ agent: agentWith([otherMessage]) }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(result.messages[0]?.content[0]?.text).toContain('<skill_folders>');
+    expect(ctx._loggerCalls.some((call) => call.level === 'warn')).toBe(false);
+  });
 });

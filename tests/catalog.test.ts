@@ -406,4 +406,24 @@ describe('折叠模型目录', () => {
     });
     expect(textOf(changed)).toContain('The available skill catalog changed.');
   });
+
+  it('已呈现正文是原生目录文本时注入折叠版', () => {
+    const native = [
+      '<system-reminder>',
+      'The following skills are available in this session.',
+      '',
+      '<available_skills>',
+      '- `lark-doc`: lark-doc 的描述',
+      '- `chrome-devtools`: chrome-devtools 的描述',
+      '</available_skills>',
+      '</system-reminder>',
+    ].join('\n');
+    const [folded] = foldCatalog([catalogMessage(['lark-doc', 'chrome-devtools'])], {
+      skills,
+      folders,
+      toolVisible: true,
+      presented: catalogBody(native),
+    });
+    expect(textOf(folded)).toContain('<skill_folders>');
+  });
 });
