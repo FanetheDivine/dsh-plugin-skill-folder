@@ -410,6 +410,57 @@ try {
     return { listed: catalog.names.length, folded: false };
   });
 
+  await check('B9 目录抖动时每轮只注入一份目录', async () => {
+    const [chosen] = state.chosen;
+    if (chosen === undefined) {
+      skip('B9 目录抖动时每轮只注入一份目录', '宿主里没有可折叠的全局技能');
+      return undefined;
+    }
+    await config({ folders: [{ name: 'rdt-dedupe', description: '实机测试', skills: [chosen] }] });
+    const registry = app.get('skills');
+    assert(registry && typeof registry.registerProvider === 'function', '缺少 registerProvider');
+    // 抖动 provider：发现完整性在轮次之间翻转，等价于缺陷的触发条件
+    const flaky = { complete: false, calls: 0 };
+    let control;
+    const unregister = registry.registerProvider((c) => {
+      control = c;
+      return {
+        name: 'rdt-flaky',
+        list: async () => {
+          flaky.calls += 1;
+          return { candidates: [], complete: flaky.complete };
+        },
+        get: async () => undefined,
+      };
+    });
+    try {
+      const requestText = (calls) => plain(calls.flatMap((call) => call.messages ?? []));
+      const countCatalogs = (calls) => requestText(calls).split('<available_skills>').length - 1;
+      const a = await create('rdt-catalog-dedupe');
+      await probe(a);
+      for (let round = 0; round < 4; round += 1) {
+        flaky.complete = round % 2 === 0;
+        control.invalidate();
+        const observed = await registry.snapshot({});
+        assert.equal(observed.complete, flaky.complete, '抖动 provider 未改变发现完整性');
+        const calls = await probe(a);
+        assert.equal(countCatalogs(calls), 1, `第 ${round + 2} 轮请求应只有 1 份目录`);
+        assert(
+          !requestText(calls).includes('The available skill catalog changed.'),
+          `第 ${round + 2} 轮出现了「目录已变化」首句`,
+        );
+      }
+      const catalogs = typed(a, 'user/message').filter(
+        (event) => event.data.source?.kind === 'skill-catalog',
+      );
+      assert.equal(catalogs.length, 1, `会话应只写 1 条目录消息，实际 ${catalogs.length}`);
+      assert(flaky.calls >= 3, `抖动 provider 未被反复调用：${flaky.calls}`);
+      return { turns: 5, catalogs: catalogs.length, providerCalls: flaky.calls };
+    } finally {
+      unregister();
+    }
+  });
+
   await check('B8 运行中的服务器返回全局技能 JSON', async () => {
     const webServer = app.get('webServer');
     assert(webServer, '缺少 webServer 服务');

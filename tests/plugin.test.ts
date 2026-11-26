@@ -358,3 +358,148 @@ describe('始终分组', () => {
     expect(ctx._loggerCalls.some((call) => call.level === 'warn')).toBe(true);
   });
 });
+
+describe('目录去重接线', () => {
+  /** 带会话可见记录的 agent。 */
+  const agentWith = (messages: unknown[]) => ({
+    id: 'a',
+    session: { deriveMessages: () => messages },
+  });
+
+  /** 会话里已呈现的目录消息。 */
+  const presentedMessage = (text: string) => ({
+    role: 'user',
+    source: { kind: 'skill-catalog', form: 'catalog', entries: [] },
+    content: [{ type: 'text', text }],
+  });
+
+  /** 一条普通用户消息。 */
+  const otherMessage = {
+    id: 'user-1',
+    role: 'user',
+    content: [{ type: 'text', text: 'hi' }],
+    source: { kind: 'user' },
+  };
+
+  /** 折叠一张目录并返回折叠文本。 */
+  const foldOnce = async (ctx: ReturnType<typeof makePluginCtx>): Promise<string> => {
+    const result = (await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    return result.messages[0]?.content[0]?.text ?? '';
+  };
+
+  it('已呈现同一份正文时把重发的目录消息移出本步', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const presented = await foldOnce(ctx);
+    expect(presented).toContain('<skill_folders>');
+    const result = (await ctx._runPreStep(
+      { agent: agentWith([presentedMessage(presented)]) },
+      async () => ({ kind: 'enter' as const, messages: [otherMessage, ctx.catalog] }),
+    )) as { messages: unknown[] };
+    expect(result.messages).toEqual([otherMessage]);
+  });
+
+  it('目录变化时注入一次更新，变化后的重复被丢弃', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const initial = await foldOnce(ctx);
+    ctx.snapshot = async () => ({
+      skills: [
+        ...ctx.skillsFixture,
+        {
+          name: 'new-skill',
+          description: '新技能',
+          invocation: { modelInvocable: true, userInvocable: true },
+          source: 'user-agents',
+        },
+      ],
+      complete: true,
+    });
+    const changedCatalog = {
+      ...ctx.catalog,
+      id: 'catalog-2',
+      source: {
+        ...ctx.catalog.source,
+        update: true as const,
+        entries: [...ctx.catalog.source.entries, { name: 'new-skill', description: '新技能' }],
+      },
+    };
+    const updated = (await ctx._runPreStep(
+      { agent: agentWith([presentedMessage(initial)]) },
+      async () => ({ kind: 'enter' as const, messages: [changedCatalog] }),
+    )) as { messages: { content: { text?: string }[] }[] };
+    const updatedText = updated.messages[0]?.content[0]?.text ?? '';
+    expect(updatedText).toContain('The available skill catalog changed.');
+    expect(updatedText).toContain('`new-skill`');
+    const repeated = (await ctx._runPreStep(
+      { agent: agentWith([presentedMessage(initial), presentedMessage(updatedText)]) },
+      async () => ({ kind: 'enter' as const, messages: [changedCatalog] }),
+    )) as { messages: unknown[] };
+    expect(repeated.messages).toEqual([]);
+  });
+
+  it('已呈现内容不同时注入折叠目录', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const result = (await ctx._runPreStep(
+      { agent: agentWith([presentedMessage('旧目录')]) },
+      async () => ({ kind: 'enter' as const, messages: [otherMessage, ctx.catalog] }),
+    )) as { messages: { content: { text?: string }[] }[] };
+    expect(result.messages).toHaveLength(2);
+    const text = result.messages[1]?.content[0]?.text ?? '';
+    expect(text).toContain('<skill_folders>');
+    expect(text).toContain('`lark` (1 skills): 飞书');
+  });
+
+  it('读取会话可见记录抛错时照常注入并记录警告', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const agent = {
+      id: 'a',
+      session: {
+        deriveMessages: () => {
+          throw new Error('boom');
+        },
+      },
+    };
+    const result = (await ctx._runPreStep({ agent }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(result.messages[0]?.content[0]?.text).toContain('<skill_folders>');
+    expect(
+      ctx._loggerCalls.some(
+        (call) => call.level === 'warn' && String(call.args[0]).includes('presented catalog'),
+      ),
+    ).toBe(true);
+  });
+
+  it('agent 没有会话读取面时按首次注入', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const result = (await ctx._runPreStep({ agent: { id: 'a' } }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(result.messages[0]?.content[0]?.text).toContain('<skill_folders>');
+    expect(
+      ctx._loggerCalls.some(
+        (call) => call.level === 'warn' && String(call.args[0]).includes('presented catalog'),
+      ),
+    ).toBe(true);
+  });
+
+  it('会话里没有目录消息时按首次注入', async () => {
+    const ctx = makePluginCtx();
+    apply(ctx as never, { folders: [{ name: 'lark', description: '飞书', skills: ['lark-doc'] }] });
+    const result = (await ctx._runPreStep({ agent: agentWith([otherMessage]) }, async () => ({
+      kind: 'enter' as const,
+      messages: [ctx.catalog],
+    }))) as { messages: { content: { text?: string }[] }[] };
+    expect(result.messages[0]?.content[0]?.text).toContain('<skill_folders>');
+    expect(ctx._loggerCalls.some((call) => call.level === 'warn')).toBe(false);
+  });
+});

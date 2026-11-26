@@ -2,7 +2,7 @@
  * 插件入口。导出宿主约定的 name、inject、apply 与 Config。
  */
 import { autoGroup, sameFolders } from './auto-group.ts';
-import { foldCatalog, type SkillCatalogMessage } from './catalog.ts';
+import { foldCatalog, presentedBodyOf, type SkillCatalogMessage } from './catalog.ts';
 import { type FolderConfig, type PluginConfig, readConfig } from './config.ts';
 import { PLUGIN_LABEL, TOOL_NAME } from './constants.ts';
 import { type RouteHost, registerSkillsRoute } from './routes.ts';
@@ -253,10 +253,20 @@ export function apply(ctx: Context, config?: unknown): void {
             return decision;
           }
           if (snapshot === undefined) return decision;
+          // 读不到已呈现记录时按未知处理：照常注入一条折叠目录
+          let presented: string | undefined;
+          try {
+            presented = presentedBodyOf(agent.session.deriveMessages());
+          } catch (error) {
+            services.logger.warn?.(
+              `[${PLUGIN_LABEL}] presented catalog unavailable: ${String(error)}`,
+            );
+          }
           const folded = foldCatalog(decision.messages as unknown as SkillCatalogMessage[], {
             skills: snapshot.skills,
             folders: current.folders,
             toolVisible: true,
+            presented,
           });
           return { ...decision, messages: folded as unknown as typeof decision.messages };
         },
