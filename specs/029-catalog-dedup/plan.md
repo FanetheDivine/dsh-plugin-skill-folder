@@ -4,25 +4,25 @@
 
 **Input**: Feature specification from `specs/029-catalog-dedup/spec.md`
 
-**Status**: Draft
+**Status**: Approved
 
 ## Open Decisions
 
-- [ ] [P-001] 判定读取使用宿主 `Session.deriveMessages()` 这一内部面，是否接受，风险如何记录？ | Depends on: none | Status: not asked
-- [ ] [P-002] 实机验证如何制造「完整标记抖动」：注册测试专用抖动 provider，还是只断言稳定目录？ | Depends on: none | Status: not asked
-- [ ] [P-003] 文档落点：`README.md` 是否补一句用户可见行为变化？ | Depends on: none | Status: not asked
-- [ ] [P-004] CHANGELOG 条目写在哪里、按哪个版本号？ | Depends on: none | Status: not asked
-- [ ] [P-005] 单元测试范围是否包含「读取失败退化」与「最后一条是原生目录」两个用例？ | Depends on: none | Status: not asked
+- none
 
 ## Clarifications
 
 ### Session 2026-11-26
 
-- 待确认决策见 `Open Decisions`。
+- [P-001] Q: 判定读取使用宿主 `Session.deriveMessages()` 这一内部面，是否接受，风险如何记录？ -> A: 接受；在 `docs/known-risks.md` 记录「依赖宿主 Session 类方法」，实现处做能力检测，缺失按未知处理。
+- [P-002] Q: 实机验证如何制造「完整标记抖动」？ -> A: 在实机驱动里用 `ctx.skills.registerProvider` 注册测试专用抖动 provider，其 `list()` 交替返回不完整观测；provider 只存在于实机 profile，不进包与 `package.json`。
+- [P-003] Q: `README.md` 是否补一句用户可见行为变化？ -> A: 补，在折叠相关小节说明「目录只在变化时出现一次」。
+- [P-004] Q: CHANGELOG 条目写在哪里？ -> A: 在 `CHANGELOG.md` 加 `## Unreleased` 与 `### Fixed` 条目，版本号留给 release 脚本归档。
+- [P-005] Q: 单元测试范围？ -> A: 「正文相同丢弃」「正文不同注入」之外，补「读取失败或缺失按首次注入」与「最后一条是原生目录时注入折叠版」。
 
 ## Review Record
 
-- 2026-11-26 | Decision: Draft | Scope: current full document | Open items: P-001..P-005 | Risks: none
+- 2026-11-26 | Decision: Approved | Scope: current full document | Open items: none | Risks: 依赖宿主 `Session.deriveMessages()` 内部面
 
 ## Summary
 
