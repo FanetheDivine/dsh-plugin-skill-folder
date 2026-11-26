@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-26
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "插件会持续注入 skill 块。会话中每一轮都收到内容完全相同的 system-reminder（The available skill catalog changed… + available_skills + skill_folders），目录实际没有变化时仍反复出现，浪费上下文。排查触发条件与目录变化比较逻辑，给出根因并修复，补测试；验证方式：连续多轮对话，目录不变时只在首次注入。"
 
@@ -25,7 +25,7 @@
 
 ## Review Record
 
-- 2026-11-26 | Decision: Draft | Scope: current full document | Open items: none | Risks: 宿主会话读取接口的取舍待计划在实现细节中确认
+- 2026-11-26 | Decision: Approved | Scope: current full document | Open items: none | Risks: 宿主会话读取接口的取舍待计划在实现细节中确认
 
 ## Background（排查结论）
 
